@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Test Gauge and Table</title>
+  <link rel="stylesheet" href="./assets/css/styles.css"/>
+  <style>
+    body { padding: 20px; background: #f7f8fb; }
+    .test-section {
+      background: white;
+      padding: 20px;
+      margin: 20px auto;
+      max-width: 800px;
+      border-radius: 16px;
+      border: 1px solid #e6e8ef;
+    }
+    h2 { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="test-section">
+    <h2>Test 1: Key Results Table</h2>
+    <div class="subTitle">Key results (partial)</div>
+    <div class="resultTableWrap">
+      <table class="resultTable" id="testTable">
+        <thead>
+          <tr><th>Model</th><th>Input</th><th>Score</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ECG Arrhythmia Detection</td>
+            <td>CSI</td>
+            <td>1.23</td>
+            <td>elevated</td>
+          </tr>
+          <tr>
+            <td>Blood Pressure Prediction</td>
+            <td>UWB</td>
+            <td>0.95</td>
+            <td>normal</td>
+          </tr>
+          <tr>
+            <td>Sleep Stage Estimation</td>
+            <td>Depth</td>
+            <td>1.67</td>
+            <td>elevated</td>
+          </tr>
+          <tr>
+            <td>Metabolic Assessment</td>
+            <td>IMU</td>
+            <td>1.12</td>
+            <td>normal</td>
+          </tr>
+          <tr>
+            <td>Risk Scoring</td>
+            <td>RGB</td>
+            <td>2.05</td>
+            <td>high</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 2: Fall Probability - Progress Bar Style</h2>
+    <div class="chartBox">
+      <div class="chartTitle">Fall probability - 25% (Low risk)</div>
+      <div class="svgBox" id="gauge1"></div>
+    </div>
+    <br>
+    <div class="chartBox">
+      <div class="chartTitle">Fall probability - 55% (Moderate risk)</div>
+      <div class="svgBox" id="gauge2"></div>
+    </div>
+    <br>
+    <div class="chartBox">
+      <div class="chartTitle">Fall probability - 80% (High risk)</div>
+      <div class="svgBox" id="gauge3"></div>
+    </div>
+  </div>
+
+  <div class="test-section">
+    <h2>Test 3: Model Cards</h2>
+    <div class="clusterGrid">
+      <div class="modelCard active">
+        <div class="modelName">ECG Arrhythmia</div>
+        <div class="modelSub">CSI Heart Pattern</div>
+        <div class="modelBadge">CSI → secure_ecg_toolbox</div>
+      </div>
+      <div class="modelCard active">
+        <div class="modelName">Blood Pressure</div>
+        <div class="modelSub">UWB Regression</div>
+        <div class="modelBadge">UWB → secure_bp_toolbox</div>
+      </div>
+      <div class="modelCard active">
+        <div class="modelName">Metabolic Score</div>
+        <div class="modelSub">IMU Proxy</div>
+        <div class="modelBadge">IMU → secure_metabolic_toolbox</div>
+      </div>
+      <div class="modelCard inactive">
+        <div class="modelName">Anomaly Check</div>
+        <div class="modelSub">Cross-modality</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./assets/js/app.js"></script>
+  <script>
+    // Test gauge rendering with different probabilities
+    document.addEventListener('DOMContentLoaded', () => {
+      const gauge1 = document.getElementById('gauge1');
+      const gauge2 = document.getElementById('gauge2');
+      const gauge3 = document.getElementById('gauge3');
+
+      if (gauge1) gauge1.innerHTML = svgGauge(0.25, 'Low risk');
+      if (gauge2) gauge2.innerHTML = svgGauge(0.55, 'Moderate risk');
+      if (gauge3) gauge3.innerHTML = svgGauge(0.80, 'High risk');
+    });
+  </script>
+</body>
+</html>

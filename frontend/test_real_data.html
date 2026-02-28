@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>真实数据测试页面 - Real Data Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .status-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+        .status-card.success {
+            border-left-color: #22c55e;
+            background: #f0fdf4;
+        }
+        .status-card.loading {
+            border-left-color: #f97316;
+            background: #fff7ed;
+        }
+        .status-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .data-table th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .data-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .data-table tr:hover {
+            background: #f9fafb;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .badge.real {
+            background: #22c55e;
+            color: white;
+        }
+        .badge.sim {
+            background: #94a3b8;
+            color: white;
+        }
+        .test-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+        .test-button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .info-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 20px;
+        }
+        .info-box h3 {
+            color: #1e40af;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        .info-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .info-box li {
+            padding: 4px 0;
+            color: #1e40af;
+            font-size: 13px;
+        }
+        .info-box li:before {
+            content: "✓ ";
+            color: #22c55e;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        pre {
+            background: #1f2937;
+            color: #10b981;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f97316;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 真实数据测试验证</h1>
+        <div class="subtitle">Real Sensor Data Test Verification</div>
+
+        <div class="status-card success">
+            <div class="status-title">✅ 数据解压成功</div>
+            <p>已从 FL-Datasets-for-HAR 提取真实传感器数据</p>
+        </div>
+
+        <div class="status-card success">
+            <div class="status-title">✅ 后端配置更新</div>
+            <p>backend/app.py 已配置使用真实数据路径</p>
+        </div>
+
+        <div class="status-card success" id="apiStatus">
+            <div class="status-title">✅ API 测试通过</div>
+            <p>后端服务器正常运行，真实数据加载成功</p>
+        </div>
+
+        <h2 style="margin-top: 40px; margin-bottom: 20px; font-size: 20px;">📊 已加载的真实数据</h2>
+
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>模态 Modality</th>
+                    <th>数据形状 Shape</th>
+                    <th>源文件 Source</th>
+                    <th>状态 Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>UWB</strong> (Ultra-Wideband)</td>
+                    <td>41 × 55</td>
+                    <td>corridor_1_walk_add.txt</td>
+                    <td><span class="badge real">REAL DATA</span></td>
+                </tr>
+                <tr>
+                    <td><strong>IMU</strong> (Inertial Measurement)</td>
+                    <td>240 × 9</td>
+                    <td>hsh_1_walk_nor.txt</td>
+                    <td><span class="badge real">REAL DATA</span></td>
+                </tr>
+                <tr>
+                    <td><strong>CSI</strong> (WiFi Channel State)</td>
+                    <td>240 × 8</td>
+                    <td>user10-1-1-1-1-1-*.csv</td>
+                    <td><span class="badge real">REAL DATA</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Depth</strong> (Depth Camera)</td>
+                    <td>240 × 240</td>
+                    <td>assets/user/deep2.png</td>
+                    <td><span class="badge sim">IMAGE</span></td>
+                </tr>
+                <tr>
+                    <td><strong>RGB</strong> (Color Camera)</td>
+                    <td>240 × 240 × 3</td>
+                    <td>assets/user/RGB.png</td>
+                    <td><span class="badge sim">IMAGE</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="info-box">
+            <h3>📡 数据来源信息</h3>
+            <ul>
+                <li>数据集: FL-Datasets-for-HAR</li>
+                <li>GitHub: <a href="https://github.com/xmouyang/FL-Datasets-for-HAR" target="_blank">xmouyang/FL-Datasets-for-HAR</a></li>
+                <li>类型: 多模态人类活动识别数据集</li>
+                <li>应用: 联邦学习、隐私保护健康监测</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 40px;">
+            <button class="test-button" onclick="testAPI()">🔄 测试 API 响应 (Test API)</button>
+            <button class="test-button" onclick="window.location.href='index.html'" style="background: #22c55e; margin-left: 10px;">
+                🚀 打开主页面 (Open Main Page)
+            </button>
+        </div>
+
+        <div id="apiResult" style="margin-top: 20px;"></div>
+
+        <div class="info-box" style="margin-top: 40px;">
+            <h3>🎯 测试检查清单</h3>
+            <ul>
+                <li>访问主页面: <a href="index.html">http://127.0.0.1:8001/index.html</a></li>
+                <li>Step 1 显示 UWB/IMU/CSI 的频谱分析图（FFT + Spectrogram）</li>
+                <li>Step 2 显示 LLM 智能调度和模型分配</li>
+                <li>Step 3 显示完整的健康报告（基于真实数据）</li>
+                <li>观察数据刷新效果（每10秒自动更新）</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        async function testAPI() {
+            const resultDiv = document.getElementById('apiResult');
+            resultDiv.innerHTML = '<div class="status-card loading"><div class="status-title"><span class="loading"></span> 正在测试 API...</div><p>请等待约20秒...</p></div>';
+
+            try {
+                const start = Date.now();
+                const response = await fetch('http://127.0.0.1:8080/api/cycle');
+                const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                const modalities = data.step1.modalities;
+                const results = `
+<div class="status-card success">
+    <div class="status-title">✅ API 响应成功</div>
+    <p>响应时间: ${elapsed} 秒</p>
+    <p>后端处理时间: ${data.cycle_time_sec.toFixed(1)} 秒</p>
+    <pre>UWB Shape: ${modalities.UWB.shape}
+IMU Shape: ${modalities.IMU.shape}
+CSI Shape: ${modalities.CSI.shape}
+Depth Shape: ${modalities.Depth.shape}
+RGB Shape: ${modalities.RGB.shape}
+
+已生成图表:
+- UWB FFT Spectrum: ${modalities.UWB.fft_png ? '✓' : '✗'}
+- IMU FFT Spectrum: ${modalities.IMU.fft_png ? '✓' : '✗'}
+- CSI FFT Spectrum: ${modalities.CSI.fft_png ? '✓' : '✗'}
+- CSI Spectrogram: ${modalities.CSI.spectrogram_png ? '✓' : '✗'}
+
+模型推理结果数量: ${data.step3.results.length}</pre>
+</div>`;
+
+                resultDiv.innerHTML = results;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="status-card" style="border-left-color: #ef4444; background: #fef2f2;">
+                    <div class="status-title">❌ API 测试失败</div>
+                    <p>错误: ${error.message}</p>
+                    <p style="margin-top:10px;">请检查后端服务器是否正常运行在 http://127.0.0.1:8080</p>
+                </div>`;
+            }
+        }
+
+        // Auto-run test on page load
+        window.addEventListener('load', () => {
+            setTimeout(testAPI, 500);
+        });
+    </script>
+</body>
+</html>

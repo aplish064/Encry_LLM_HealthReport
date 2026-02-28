@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Secure Multimodal HE + LLM Demo</title>
+  <link rel="stylesheet" href="./assets/css/styles.css"/>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brandmark"></div>
+      <div>
+        <div class="title">Homomorphic Secure Inference Demo</div>
+        <div class="subtitle">Local multimodal sensing → Encrypt → DeepSeek dispatch → Homomorphic model cluster → Clinical report</div>
+      </div>
+    </div>
+    <div class="controls">
+      <span class="pill mono" id="cycleMeta">Auto refresh: 10s</span>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="grid grid3">
+      <!-- Step 1 -->
+      <div class="card" id="stepUpload">
+        <div class="cardHead">
+          <div class="stepTag">1</div>
+          <div class="cardTitle">Local Multimodal Data Stream</div>
+          <div class="meta"><span class="pill" id="tUpload">—</span></div>
+        </div>
+        <div class="cardBody">
+          <div class="hint">
+            Five modalities: Depth, UWB, IMU, CSI, RGB. Real sensor data with frequency spectrum analysis.
+          </div>
+
+          <!-- Plaintext data preview -->
+          <div class="rowBlock">
+            <div class="rowTitle">Multimodal Data (Plaintext Preview)</div>
+            <div class="modalityGrid" id="modalityPlainGrid"><!-- filled by JS --></div>
+          </div>
+
+          <hr class="divider" style="margin: 12px 0;">
+
+          <!-- Detailed Frequency Analysis Section -->
+          <div class="detailedAnalysis">
+            <div class="rowTitle">Frequency Spectrum Analysis</div>
+            <div class="analysisTabNav">
+              <button class="tabBtn active" data-tab="uwb">UWB</button>
+              <button class="tabBtn" data-tab="imu">IMU</button>
+              <button class="tabBtn" data-tab="csi">CSI</button>
+            </div>
+            <div class="analysisTabContent">
+              <div id="analysisPanel" class="analysisPanel">
+                <!-- FFT charts will be inserted here -->
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="spinnerOverlay" id="spinUpload">
+          <div class="spinner"></div><div class="spinText">Refreshing multimodal data…</div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="card" id="stepDispatch">
+        <div class="cardHead">
+          <div class="stepTag">2</div>
+          <div class="cardTitle">DeepSeek Dispatch → Homomorphic Prediction Model Cluster</div>
+          <div class="meta"><span class="pill" id="tDispatch">—</span></div>
+        </div>
+        <div class="cardBody">
+          <div class="flowRow">
+            <div class="flowNode">
+              <img class="icon" src="./assets/icons/deepseek.png" onerror="this.style.display='none'"/>
+              <div class="flowLabel">DeepSeek</div>
+            </div>
+            <div class="flowEdge">
+              <img class="icon small" src="./assets/icons/network.png" onerror="this.style.display='none'"/>
+              <div class="edgeLine"></div>
+              <div class="edgeText">dispatch</div>
+            </div>
+            <div class="flowNode">
+              <img class="clusterIcon" src="./assets/icons/model.png" alt="Model cluster" onerror="this.style.display='none'"/>
+              <div class="flowLabel">Multiple tools</div>
+            </div>
+          </div>
+<div class="clusterWrap">
+            <div class="clusterTitle">Homomorphic Prediction Model Cluster</div>
+            <div class="clusterGrid" id="modelCluster">
+              <!-- filled by JS -->
+            </div>
+          </div>
+
+          <hr class="divider"/>
+
+          <div class="subTitle">Encrypted inference ciphertext preview</div>
+          <div class="kv">
+            <div class="k">Aggregate ciphertext preview</div>
+            <div class="v mono" id="ctResPreview">—</div>
+          </div>
+        </div>
+
+        <div class="spinnerOverlay" id="spinDispatch">
+          <div class="spinner"></div><div class="spinText">Encrypting + dispatching + running HE tools…</div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="card" id="stepDecrypt">
+        <div class="cardHead">
+          <div class="stepTag">3</div>
+          <div class="cardTitle">Clinical Report Generation</div>
+          <div class="meta"><span class="pill" id="tDecrypt">—</span></div>
+        </div>
+        <div class="cardBody">
+          <!-- Single column layout: Key results -> Recommendations -> Conclusion -->
+          <div class="resultsSection">
+            <div class="subTitle">Key results (partial)</div>
+            <div class="resultTableWrap">
+              <table class="resultTable" id="resultTable">
+                <thead>
+                  <tr><th>Model</th><th>Input</th><th>Score</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td colspan="4" style="text-align:center; color: #5b6474;">Loading...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <hr class="divider"/>
+
+          <div class="subTitle">Recommendations</div>
+          <div class="recommendPanel" id="recommendPanel">Loading...</div>
+
+          <hr class="divider"/>
+
+          <div class="subTitle">Conclusion</div>
+          <div class="reportPanel" id="conclusionPanel">Loading...</div>
+          <!-- fallback plain text (kept for compatibility) -->
+          <div class="reportBox" id="reportText" style="display:none">—</div>
+        </div>
+        <div class="spinnerOverlay" id="spinDecrypt">
+          <div class="spinner"></div><div class="spinText">Generating report…</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./assets/js/app.js"></script>
+</body>
+</html>

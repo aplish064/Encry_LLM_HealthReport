@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+numpy
+tenseal
+mcp
+openai
+matplotlib
+fastmcp
+torch
