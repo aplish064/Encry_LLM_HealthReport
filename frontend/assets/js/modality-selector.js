@@ -2,6 +2,9 @@
  * 模态选择器 - 管理模态卡片交互
  */
 
+// API基础URL - 指向后端服务器
+const API_BASE = (window.API_BASE || "http://127.0.0.1:8082");
+
 class ModalitySelector {
   constructor() {
     this.selectedModalities = new Set();
@@ -30,7 +33,7 @@ class ModalitySelector {
 
   async loadModalities() {
     try {
-      const response = await this.fetchWithTimeout('/api/modalities', {
+      const response = await this.fetchWithTimeout(`${API_BASE}/api/modalities`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -277,7 +280,7 @@ class ModalitySelector {
       this.updateProgress(20, `正在分析... (尝试 ${attempt}/${this.maxRetries})`);
 
       const response = await this.fetchWithTimeout(
-        `/api/cycle?selected_modalities=${encodeURIComponent(selectedList)}`,
+        `${API_BASE}/api/cycle?selected_modalities=${encodeURIComponent(selectedList)}`,
         {
           method: 'GET',
           headers: {
