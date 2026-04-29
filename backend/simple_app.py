@@ -10,6 +10,9 @@ import base64
 import tempfile
 from io import BytesIO
 from typing import Dict, Any, Optional, List
+from functools import lru_cache
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import tenseal as ts
 import matplotlib
@@ -33,6 +36,7 @@ DEPTH_PNG_PATH = os.path.join(ASSET_USER_DIR, "deep2.png")
 RGB_PNG_PATH = os.path.join(ASSET_USER_DIR, "RGB.png")
 
 _DATA_CACHE: Dict[str, np.ndarray] = {}
+_THUMBNAIL_CACHE: Dict[str, str] = {}  # Cache for generated thumbnails
 MODALITY_CONFIG = {
     "Depth": {"enabled": True, "file": DEPTH_PNG_PATH},
     "UWB": {"enabled": True, "file": DATA_PATHS["UWB"]},
@@ -40,6 +44,9 @@ MODALITY_CONFIG = {
     "CSI": {"enabled": True, "file": DATA_PATHS["CSI"]},
     "RGB": {"enabled": True, "file": RGB_PNG_PATH},
 }
+
+# Thread pool for parallel processing
+executor = ThreadPoolExecutor(max_workers=4)
 
 # 智谱AI配置
 ZHIPU_API_KEY = "3e53672cccc548629e749d7436098975.yVFwqfG0ATQ69Ro4"
@@ -74,7 +81,14 @@ def png_b64_from_plt(fig, pad_inches: float = 0.06) -> str:
     return b64e(bio.getvalue())
 
 def generate_thumbnail(data: np.ndarray, modality_type: str, size=(64, 64)) -> str:
-    """生成预览缩略图"""
+    """生成预览缩略图（带缓存）"""
+    # 创建缓存键
+    cache_key = f"{modality_type}_{data.shape}_{size}"
+
+    # 检查缓存
+    if cache_key in _THUMBNAIL_CACHE:
+        return _THUMBNAIL_CACHE[cache_key]
+
     try:
         fig = plt.figure(figsize=(size[0]/100, size[1]/100), dpi=100)
 
@@ -101,20 +115,34 @@ def generate_thumbnail(data: np.ndarray, modality_type: str, size=(64, 64)) -> s
         plt.axis('off')
         plt.tight_layout(pad=0)
 
-        return png_b64_from_plt(fig)
+        result = png_b64_from_plt(fig)
+
+        # 缓存结果
+        _THUMBNAIL_CACHE[cache_key] = result
+
+        return result
     except Exception as e:
         print(f"缩略图生成失败: {e}")
         return ""
 
 def png_b64_from_file(path: str) -> Optional[str]:
+    """Load and convert image file to base64 with caching."""
+    if path in _THUMBNAIL_CACHE:
+        return _THUMBNAIL_CACHE[path]
+
     try:
         with open(path, "rb") as f:
-            return b64e(f.read())
+            result = b64e(f.read())
+            _THUMBNAIL_CACHE[path] = result
+            return result
     except Exception:
         return None
 
+@lru_cache(maxsize=1)
 def load_modality_config() -> Dict[str, Any]:
-    """Load modality configuration from config.json or return default config."""
+    """Load modality configuration from config.json or return default config.
+    Uses LRU cache to avoid repeated file reads.
+    """
     config_path = os.path.join(BASE_DIR, "backend", "config.json")
     if os.path.exists(config_path):
         try:
