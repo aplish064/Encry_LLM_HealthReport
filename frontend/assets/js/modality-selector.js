@@ -5,12 +5,13 @@
 class ModalitySelector {
   constructor() {
     this.selectedModalities = new Set();
-    this.maxSelection = 5;
+    this.maxSelection = 10; // 支持最多10种模态
     this.modalities = [];
     this.isLoading = false;
     this.retryCount = 0;
     this.maxRetries = 3;
     this.apiTimeout = 30000; // 30 seconds
+    this.modalityThumbnails = {}; // 存储模态缩略图
     this.init();
   }
 
@@ -18,6 +19,7 @@ class ModalitySelector {
     try {
       this.setLoadingState(true);
       await this.loadModalities();
+      await this.loadModalityThumbnails(); // 加载缩略图
       this.renderCards();
       this.attachEventListeners();
     } catch (error) {
@@ -60,6 +62,40 @@ class ModalitySelector {
       this.modalities = this.getDefaultModalities();
       this.showWarning('使用默认模态配置');
     }
+  }
+
+  async loadModalityThumbnails() {
+    // 加载每个模态的缩略图预览
+    const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8082";
+
+    // 为每个模态请求缩略图
+    const thumbnailPromises = this.modalities.map(async (modality) => {
+      try {
+        const response = await this.fetchWithTimeout(
+          `${apiBase}/api/modality_thumbnail?modality=${encodeURIComponent(modality.name)}`,
+          { method: 'GET' }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.thumbnail) {
+            this.modalityThumbnails[modality.name] = data.thumbnail;
+          }
+        }
+      } catch (error) {
+        console.warn(`无法加载 ${modality.name} 的缩略图:`, error);
+        // 使用默认图标
+        this.modalityThumbnails[modality.name] = null;
+      }
+    });
+
+    // 并行加载所有缩略图，但不阻塞初始化
+    Promise.all(thumbnailPromises).then(() => {
+      // 缩略图加载完成后重新渲染卡片
+      this.renderCards();
+    }).catch(err => {
+      console.warn('部分缩略图加载失败:', err);
+    });
   }
 
   async fetchWithTimeout(url, options = {}, timeout = this.apiTimeout) {
@@ -166,8 +202,14 @@ class ModalitySelector {
       card.dataset.modalityId = modality.id;
       card.dataset.modalityName = modality.name;
 
+      // 使用缩略图或默认图标
+      const thumbnailData = this.modalityThumbnails[modality.name];
+      const iconDisplay = thumbnailData
+        ? `<img src="data:image/png;base64,${thumbnailData}" class="card-thumbnail" alt="${modality.name}">`
+        : `<div class="card-icon">${modality.icon || '📊'}</div>`;
+
       card.innerHTML = `
-        <div class="card-icon">${modality.icon}</div>
+        ${iconDisplay}
         <div class="card-title">${modality.name}</div>
         <div class="card-desc">${modality.description}</div>
       `;
@@ -229,6 +271,52 @@ class ModalitySelector {
     const analyzeBtn = document.getElementById('analyzeBtn');
     if (analyzeBtn) {
       analyzeBtn.disabled = this.selectedModalities.size === 0;
+    }
+
+    // 动态更新Step 2的工具集群显示
+    this.updateModelCluster();
+  }
+
+  updateModelCluster() {
+    // 根据选中的模态更新Step 2的Homomorphic Prediction Model Cluster
+    const clusterGrid = document.getElementById('modelCluster');
+    if (!clusterGrid) return;
+
+    // 清空现有内容
+    clusterGrid.innerHTML = '';
+
+    // 模态到工具的映射关系
+    const modalityToolMap = {
+      'Depth': { id: 'sleep', title: 'Sleep Staging', subtitle: 'Depth-based Model', icon: '🛏️' },
+      'UWB': { id: 'bp', title: 'Blood Pressure', subtitle: 'UWB Regression', icon: '📡' },
+      'IMU': { id: 'metabolic', title: 'Metabolic Score', subtitle: 'IMU Proxy', icon: '🏃' },
+      'CSI': { id: 'ecg', title: 'ECG Arrhythmia', subtitle: 'CSI Heart Pattern', icon: '📶' },
+      'RGB': { id: 'risk', title: 'Risk Assessment', subtitle: 'RGB Triage', icon: '📷' },
+      'NTU': { id: 'action', title: 'Action Recognition', subtitle: 'Skeleton Model', icon: '🦴' },
+      'Retina': { id: 'cardio', title: 'Cardiovascular', subtitle: 'Retina Analysis', icon: '👁️' },
+      'Chest': { id: 'lung', title: 'Lung Screening', subtitle: 'X-ray Analysis', icon: '🫁' },
+      'Path': { id: 'cancer', title: 'Cancer Detection', subtitle: 'Pathology Model', icon: '🔬' },
+      'Blood': { id: 'blood', title: 'Blood Analysis', subtitle: 'Hematology Model', icon: '🩸' }
+    };
+
+    // 为每个选中的模态创建工具卡片
+    this.selectedModalities.forEach(modalityName => {
+      const tool = modalityToolMap[modalityName];
+      if (tool) {
+        const toolCard = document.createElement('div');
+        toolCard.className = 'clusterCard';
+        toolCard.innerHTML = `
+          <div class="clusterIcon">${tool.icon}</div>
+          <div class="clusterCardTitle">${tool.title}</div>
+          <div class="clusterCardSubtitle">${tool.subtitle}</div>
+        `;
+        clusterGrid.appendChild(toolCard);
+      }
+    });
+
+    // 如果没有选中任何模态，显示提示
+    if (this.selectedModalities.size === 0) {
+      clusterGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #6b7280; padding: 20px;">请选择模态以查看对应的工具</div>';
     }
   }
 

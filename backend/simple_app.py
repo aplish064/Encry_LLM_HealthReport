@@ -857,6 +857,37 @@ async def get_modalities():
             ]
         }
 
+@app.get("/api/modality_thumbnail")
+async def get_modality_thumbnail(modality: str):
+    """获取指定模态的缩略图预览"""
+    try:
+        # 加载模态数据
+        data = get_data(modality)
+        if data is None:
+            return {"thumbnail": None, "error": "Modality not found"}
+
+        # 确定数据类型
+        modality_config = load_modality_config()
+        mod_info = modality_config.get(modality, {})
+        data_type = mod_info.get("type", "sensor")
+
+        # 生成缩略图
+        modality_type_map = {
+            "timeseries": "timeseries",
+            "image": "image",
+            "medical_image": "image",
+            "skeleton": "skeleton"
+        }
+        modality_type = modality_type_map.get(data_type, "timeseries")
+
+        thumbnail = generate_thumbnail(data, modality_type)
+
+        return {"thumbnail": thumbnail, "modality": modality, "type": modality_type}
+
+    except Exception as e:
+        print(f"生成缩略图失败 ({modality}): {e}")
+        return {"thumbnail": None, "error": str(e)}
+
 @app.get("/api/cycle")
 async def run_cycle(selected_modalities: Optional[str] = None):
     """执行完整的数据处理周期 - 支持选择性模态加载
