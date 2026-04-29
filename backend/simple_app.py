@@ -98,49 +98,115 @@ def png_b64_from_plt(fig, pad_inches: float = 0.06) -> str:
     plt.close(fig)
     return b64e(bio.getvalue())
 
-def generate_thumbnail(data: np.ndarray, modality_type: str, size=(64, 64)) -> str:
-    """生成预览缩略图（带缓存）"""
+def generate_thumbnail(data: np.ndarray, modality_type: str, size=(200, 150)) -> str:
+    """生成高质量预览缩略图（带缓存）"""
     # 创建缓存键
-    cache_key = f"{modality_type}_{data.shape}_{size}"
+    cache_key = f"{modality_type}_{data.shape}_{size[0]}x{size[1]}"
 
     # 检查缓存
     if cache_key in _THUMBNAIL_CACHE:
         return _THUMBNAIL_CACHE[cache_key]
 
     try:
-        fig = plt.figure(figsize=(size[0]/100, size[1]/100), dpi=100)
+        # 创建更大的图形以获得更好的质量
+        fig, ax = plt.subplots(figsize=(size[0]/100, size[1]/100), dpi=150)
 
         if modality_type == 'timeseries':
-            # 时序数据：显示前50个点
+            # 时序数据：多通道可视化
+            display_points = min(100, data.shape[0])
+            colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+
             if data.ndim == 1:
-                plt.plot(data[:50], linewidth=1, color='#3b82f6')
+                # 单通道
+                ax.plot(data[:display_points], linewidth=1.5, color=colors[0], alpha=0.8)
+                ax.fill_between(range(display_points), data[:display_points], alpha=0.2, color=colors[0])
             else:
-                plt.plot(data[:50, 0], linewidth=1, color='#3b82f6')
+                # 多通道：显示前3个通道
+                num_channels = min(3, data.shape[1])
+                for i in range(num_channels):
+                    ax.plot(data[:display_points, i], linewidth=1.2,
+                           color=colors[i % len(colors)], alpha=0.7,
+                           label=f'Ch{i+1}')
+
+            ax.set_facecolor('#f8fafc')
+            ax.grid(True, alpha=0.3, linewidth=0.5)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+
         elif modality_type == 'skeleton':
-            # 骨骼数据：显示简单轮廓
-            plt.scatter(data[::3], data[1::3], c='#3b82f6', s=10)
-        elif modality_type in ['image', 'medical_image']:
-            # 图像数据：调整大小显示
-            from PIL import Image
-            if data.ndim == 3:
-                img = data[0] if data.shape[0] < 100 else data
+            # 骨骼数据：3D散点图
+            from mpl_toolkits.mplot3d import Axes3D
+            fig = plt.figure(figsize=(size[0]/100, size[1]/100), dpi=150)
+            ax = fig.add_subplot(111, projection='3d')
+
+            # 重塑数据为 (N, 3)
+            if data.ndim == 1:
+                n_points = len(data) // 3
+                points = data[:n_points*3].reshape(n_points, 3)
+            elif data.ndim == 2 and data.shape[1] >= 3:
+                points = data[:, :3]
             else:
-                img = data
-            img_pil = Image.fromarray((img * 255).astype(np.uint8))
-            img_pil = img_pil.resize(size)
-            plt.imshow(img_pil, cmap='gray')
+                points = data.flatten()[:30].reshape(10, 3)
 
-        plt.axis('off')
+            # 绘制3D散点
+            ax.scatter(points[:, 0], points[:, 1], points[:, 2],
+                      c=range(len(points)), cmap='viridis', s=20, alpha=0.6)
+
+            ax.set_facecolor('#f8fafc')
+            ax.grid(False)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_zticks([])
+
+        elif modality_type in ['image', 'medical_image']:
+            # 图像数据：高质量显示
+            from PIL import Image
+
+            # 标准化数据到0-255
+            if data.dtype == np.float64 or data.dtype == np.float32:
+                data = np.clip(data, 0, 1)
+
+            # 处理不同维度的图像
+            if data.ndim == 3:
+                if data.shape[0] <= 4:  # 通道在前
+                    data = np.moveaxis(data, 0, -1)
+                if data.shape[-1] == 1:  # 单通道
+                    data = data[:, :, 0]
+                    ax.imshow(data, cmap='viridis')
+                elif data.shape[-1] == 3:  # RGB
+                    ax.imshow(data)
+                else:  # 多通道，取前3个
+                    ax.imshow(data[:, :, :3])
+            else:
+                # 2D图像
+                if data.max() <= 1.0:
+                    display_data = (data * 255).astype(np.uint8)
+                else:
+                    display_data = data.astype(np.uint8)
+                ax.imshow(display_data, cmap='viridis')
+
+            ax.axis('off')
+
+        # 通用设置
+        if modality_type != 'skeleton':
+            ax.set_xticks([])
+            ax.set_yticks([])
+
         plt.tight_layout(pad=0)
+        plt.margins(x=0, y=0)
 
-        result = png_b64_from_plt(fig)
+        result = png_b64_from_plt(fig, pad_inches=0)
+        plt.close(fig)
 
         # 缓存结果
         _THUMBNAIL_CACHE[cache_key] = result
 
         return result
+
     except Exception as e:
-        print(f"缩略图生成失败: {e}")
+        print(f"缩略图生成失败 ({modality_type}): {e}")
+        import traceback
+        traceback.print_exc()
         return ""
 
 def png_b64_from_file(path: str) -> Optional[str]:

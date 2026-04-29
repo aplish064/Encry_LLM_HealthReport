@@ -68,22 +68,33 @@ class ModalitySelector {
     // 加载每个模态的缩略图预览
     const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8082";
 
+    console.log('开始加载缩略图...');
+
     // 为每个模态请求缩略图
     const thumbnailPromises = this.modalities.map(async (modality) => {
       try {
+        console.log(`正在加载 ${modality.name} 的缩略图...`);
+
         const response = await this.fetchWithTimeout(
           `${apiBase}/api/modality_thumbnail?modality=${encodeURIComponent(modality.name)}`,
-          { method: 'GET' }
+          { method: 'GET', timeout: 10000 }
         );
 
         if (response.ok) {
           const data = await response.json();
           if (data.thumbnail) {
             this.modalityThumbnails[modality.name] = data.thumbnail;
+            console.log(`✅ ${modality.name} 缩略图加载成功`);
+          } else {
+            console.warn(`⚠️ ${modality.name} 没有返回缩略图数据`);
+            this.modalityThumbnails[modality.name] = null;
           }
+        } else {
+          console.warn(`⚠️ ${modality.name} API响应错误: ${response.status}`);
+          this.modalityThumbnails[modality.name] = null;
         }
       } catch (error) {
-        console.warn(`无法加载 ${modality.name} 的缩略图:`, error);
+        console.warn(`❌ 无法加载 ${modality.name} 的缩略图:`, error.message);
         // 使用默认图标
         this.modalityThumbnails[modality.name] = null;
       }
@@ -91,10 +102,13 @@ class ModalitySelector {
 
     // 并行加载所有缩略图，但不阻塞初始化
     Promise.all(thumbnailPromises).then(() => {
+      console.log('所有缩略图加载完成');
       // 缩略图加载完成后重新渲染卡片
       this.renderCards();
     }).catch(err => {
       console.warn('部分缩略图加载失败:', err);
+      // 即使失败也重新渲染，使用默认图标
+      this.renderCards();
     });
   }
 
@@ -202,11 +216,21 @@ class ModalitySelector {
       card.dataset.modalityId = modality.id;
       card.dataset.modalityName = modality.name;
 
-      // 使用缩略图或默认图标
+      // 检查缩略图状态
       const thumbnailData = this.modalityThumbnails[modality.name];
-      const iconDisplay = thumbnailData
-        ? `<img src="data:image/png;base64,${thumbnailData}" class="card-thumbnail" alt="${modality.name}">`
-        : `<div class="card-icon">${modality.icon || '📊'}</div>`;
+      const hasThumbnail = thumbnailData !== undefined;
+
+      let iconDisplay;
+      if (hasThumbnail && thumbnailData) {
+        // 有缩略图
+        iconDisplay = `<img src="data:image/png;base64,${thumbnailData}" class="card-thumbnail" alt="${modality.name}">`;
+      } else if (hasThumbnail && !thumbnailData) {
+        // 加载失败，显示默认图标
+        iconDisplay = `<div class="card-icon">${modality.icon || '📊'}</div>`;
+      } else {
+        // 还在加载中，显示加载动画
+        iconDisplay = `<div class="card-loading" title="加载中..."></div>`;
+      }
 
       card.innerHTML = `
         ${iconDisplay}
@@ -216,6 +240,8 @@ class ModalitySelector {
 
       container.appendChild(card);
     });
+
+    console.log(`渲染了 ${this.modalities.length} 个模态卡片`);
   }
 
   attachEventListeners() {
