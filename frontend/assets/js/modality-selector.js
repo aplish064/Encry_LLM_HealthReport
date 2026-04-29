@@ -241,22 +241,18 @@ class ModalitySelector {
           card.dataset.modalityId = modality.id;
           card.dataset.modalityName = modality.name;
 
-          // 如果有时序或骨架数据，立即绘制Canvas
+          // 时序和骨架类型需要Canvas绘制
           if (modalityData.data && (config.type === 'timeseries' || config.type === 'skeleton')) {
-            const canvasId = `modality-${modality.id}-canvas`; // 使用完整的cardId前缀
+            const canvasId = `modality-${modality.id}-canvas`;
             console.log(`🎨 即将绘制 ${modality.id} Canvas, canvasId: ${canvasId}, 数据形状: ${modalityData.shape}`);
 
             // 等待DOM更新后绘制
             setTimeout(() => {
               const canvasElement = document.getElementById(canvasId);
               if (canvasElement) {
-                console.log(`✅ Canvas元素找到: ${canvasId}, 类型: ${config.type}, 尺寸: ${canvasElement.offsetWidth}x${canvasElement.offsetHeight}`);
+                console.log(`✅ Canvas元素找到: ${canvasId}, 类型: ${config.type}`);
                 if (config.type === 'timeseries') {
-                  // data格式: [channels][samples]，直接传递给drawTimeSeriesCard
-                  const clickHandler = ModalityCards.drawTimeSeriesCard(canvasId, modalityData.data, config);
-                  if (clickHandler) {
-                    canvasElement.addEventListener('click', clickHandler);
-                  }
+                  ModalityCards.drawTimeSeriesCard(canvasId, modalityData.data, config);
                 } else if (config.type === 'skeleton') {
                   ModalityCards.drawSkeletonCard(canvasId, modalityData.data);
                 }

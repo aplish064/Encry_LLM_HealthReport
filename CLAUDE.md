@@ -77,6 +77,14 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - Activate before running: `source venv/bin/activate` (Linux/Mac) or `venv\Scripts\activate` (Windows)
 - Install dependencies: `pip install -r backend/requirements.txt`
 
+**Port Management:**
+- **DO NOT use port 8080** - This port is often occupied by other services
+- Use alternative ports for backend: **8082, 8083, 8084** etc.
+- Preferred frontend port: **8001** (typically available)
+- Always check port availability before starting services: `lsof -i:<port>`
+- If port conflict occurs, use the next available port number
+- Update frontend `API_BASE` configuration if backend port changes
+
 **Git Commit Policy:**
 - Do NOT commit automatically unless explicitly asked
 - User handles all git commits themselves
@@ -121,6 +129,8 @@ Required: Python 3.8+, FastAPI, TenSEAL, NumPy, Matplotlib, MCP, OpenAI SDK, PyT
 
 **Note: Ensure virtual environment is activated before running**
 
+**⚠️ IMPORTANT: Do NOT use port 8080** - Use port 8082 or other available ports instead.
+
 ```bash
 # Activate venv first (see above)
 source venv/bin/activate  # Linux/Mac
@@ -129,16 +139,19 @@ venv\Scripts\activate     # Windows
 
 cd backend
 # Basic mode (simulated LLM dispatch)
-uvicorn app:app --host 127.0.0.1 --port 8080
+uvicorn app:app --host 127.0.0.1 --port 8082
 
 # With DeepSeek API integration
 export DEEPSEEK_API_KEY="your-api-key"
 export DEEPSEEK_BASE_URL="https://api.deepseek.com"
 export DEEPSEEK_MODEL="deepseek-chat"
-uvicorn app:app --host 127.0.0.1 --port 8080
+uvicorn app:app --host 127.0.0.1 --port 8082
+
+# Alternative: use simple_app.py (no MCP dependencies)
+uvicorn simple_app:app --host 127.0.0.1 --port 8082
 ```
 
-Backend runs on **port 8080** (configurable in frontend `app.js` via `API_BASE`)
+Backend runs on **port 8082** (configurable - avoid 8080, update frontend `API_BASE` if changed)
 
 ### Start Frontend Server
 
@@ -328,9 +341,10 @@ When modifying the system:
 - Chart rendering: Update `renderResults()`, `renderModalities()`, `renderStep2()`
 
 **Configuration**:
-- Backend port: Change `--port 8080` in uvicorn command
+- Backend port: Change `--port 8082` in uvicorn command (avoid 8080)
 - Frontend port: Change `8001` in http.server command
 - Data paths: Update `DATA_PATHS` in `app.py`
+- API endpoint: Update `API_BASE` in `frontend/assets/js/app.js` if backend port changes
 
 ## Troubleshooting
 
@@ -343,10 +357,11 @@ pip install tenseal --no-build-isolation
 conda install -c conda-forge tenseal
 ```
 
-**Frontend can't connect**: 
-1. Check backend is running on port 8080
+**Frontend can't connect**:
+1. Check backend is running on configured port (default: 8082, NOT 8080)
 2. Verify `API_BASE` in `frontend/assets/js/app.js` matches backend port
 3. Ensure firewall allows local connections
+4. Check browser console for CORS errors
 
 **Missing test data**: System will auto-simulate. To use real data, place files in `test_data/`:
 - `uwb_sample.txt` (whitespace or comma-separated)

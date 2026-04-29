@@ -1405,9 +1405,10 @@ async def run_cycle(selected_modalities: Optional[str] = None):
         csi_preview = plot_multichannel_preview(csi_series, "CSI Multichannel Analysis (8 Channels)", max_channels=8) if csi_series is not None else ""
 
         # 生成增强的FFT频谱图 (only for loaded modalities)
-        uwb_fft = plot_fft_spectrum(uwb_series, "UWB Frequency Spectrum Analysis", fs=24.0) if uwb_series is not None else ""
-        imu_fft = plot_fft_spectrum(imu_series, "IMU Frequency Spectrum Analysis", fs=24.0) if imu_series is not None else ""
-        csi_fft = plot_fft_spectrum(csi_series, "CSI Frequency Spectrum Analysis", fs=24.0) if csi_series is not None else ""
+        # 不生成FFT频谱图，简化处理
+        uwb_fft = ""
+        imu_fft = ""
+        csi_fft = ""
 
         # CSI暂时不生成spectrogram（可选）
         csi_spectrogram = ""
