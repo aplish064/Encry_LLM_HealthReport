@@ -262,29 +262,191 @@ def _load_csv_matrix(path: str) -> np.ndarray:
     return np.loadtxt(path, delimiter=None, dtype=float)
 
 def get_data(name: str) -> np.ndarray:
+    """加载模态数据，支持真实数据和模拟数据"""
     if name in _DATA_CACHE:
         return _DATA_CACHE[name]
+
+    # 首先尝试从DATA_PATHS加载真实数据
     p = DATA_PATHS.get(name)
-    if not p or not os.path.exists(p):
-        raise FileNotFoundError(f"Missing data file for {name}: {p}")
-    arr = _load_csv_matrix(p)
+    if p and os.path.exists(p):
+        try:
+            arr = _load_csv_matrix(p)
 
-    # 处理特定数据格式的reshape
-    if name == "UWB":
-        # UWB: 600 -> (200, 3)
-        if arr.ndim == 1:
-            arr = arr.reshape(-1, 3)
-    elif name == "IMU":
-        # IMU: 1500 -> (250, 6)
-        if arr.ndim == 1:
-            arr = arr.reshape(-1, 6)
-    elif name == "CSI":
-        # CSI: (200, 9) -> (200, 8)，去除时间列
-        if arr.ndim == 2 and arr.shape[1] > 8:
-            arr = arr[:, 1:9]  # 取后8列
+            # 处理特定数据格式的reshape
+            if name == "UWB":
+                if arr.ndim == 1:
+                    arr = arr.reshape(-1, 3)
+            elif name == "IMU":
+                if arr.ndim == 1:
+                    arr = arr.reshape(-1, 6)
+            elif name == "CSI":
+                if arr.ndim == 2 and arr.shape[1] > 8:
+                    arr = arr[:, 1:9]
 
-    _DATA_CACHE[name] = arr
-    return arr
+            _DATA_CACHE[name] = arr
+            return arr
+        except Exception as e:
+            print(f"Warning: Failed to load data from {p}: {e}")
+
+    # 对于医学图像数据集，生成模拟数据
+    if name in ["Retina", "Chest", "Path", "Blood", "NTU"]:
+        arr = _generate_medical_image_sample(name)
+        _DATA_CACHE[name] = arr
+        return arr
+
+    # 对于Depth和RGB，尝试从文件加载
+    if name == "Depth" and os.path.exists(DEPTH_PNG_PATH):
+        from PIL import Image
+        img = Image.open(DEPTH_PNG_PATH)
+        arr = np.array(img)
+        _DATA_CACHE[name] = arr
+        return arr
+
+    if name == "RGB" and os.path.exists(RGB_PNG_PATH):
+        from PIL import Image
+        img = Image.open(RGB_PNG_PATH)
+        arr = np.array(img)
+        _DATA_CACHE[name] = arr
+        return arr
+
+    raise FileNotFoundError(f"Missing data file for {name}: {p}")
+
+def _generate_medical_image_sample(modality: str) -> np.ndarray:
+    """为医学图像模态生成模拟样本数据"""
+    np.random.seed(42)  # 固定随机种子以获得一致的结果
+
+    if modality == "Retina":
+        # 视网膜图像：模拟眼底照片，圆形特征
+        size = 128
+        img = np.zeros((size, size, 3))
+        center = size // 2
+
+        # 创建径向渐变
+        y, x = np.ogrid[:size, :size]
+        mask = (x - center)**2 + (y - center)**2 <= (center - 5)**2
+
+        # 添加血管结构
+        for angle in np.linspace(0, 2*np.pi, 8):
+            x_vessel = center + (center-10) * np.cos(angle)
+            y_vessel = center + (center-10) * np.sin(angle)
+            for r in range(5, center-5):
+                x_pos = int(center + r * np.cos(angle))
+                y_pos = int(center + r * np.sin(angle))
+                if 0 <= x_pos < size and 0 <= y_pos < size:
+                    img[y_pos-1:y_pos+2, x_pos-1:x_pos+2, 0] = np.random.uniform(0.6, 0.8)
+
+        # 应用圆形遮罩
+        for c in range(3):
+            img[:, :, c] *= mask
+            img[:, :, c] += np.random.normal(0, 0.05, (size, size))
+
+        return np.clip(img, 0, 1)
+
+    elif modality == "Chest":
+        # 胸部X光：模拟肺部结构
+        size = 128
+        img = np.random.normal(0.3, 0.05, (size, size, 3))
+
+        # 创建肺部形状（两个暗色区域）
+        y, x = np.ogrid[:size, :size]
+
+        # 左肺
+        left_lung = ((x - size*0.3)**2 / 30**2 + (y - size*0.45)**2 / 35**2) <= 1
+        # 右肺
+        right_lung = ((x - size*0.7)**2 / 30**2 + (y - size*0.45)**2 / 35**2) <= 1
+
+        for c in range(3):
+            img[left_lung, c] = np.random.normal(0.15, 0.03, left_lung.sum())
+            img[right_lung, c] = np.random.normal(0.15, 0.03, right_lung.sum())
+
+        # 添加心脏阴影
+        heart = ((x - size*0.5)**2 / 15**2 + (y - size*0.55)**2 / 20**2) <= 1
+        for c in range(3):
+            img[heart, c] = np.random.normal(0.4, 0.05, heart.sum())
+
+        return np.clip(img, 0, 1)
+
+    elif modality == "Path":
+        # 病理图像：模拟组织细胞结构
+        size = 128
+        img = np.random.normal(0.5, 0.1, (size, size, 3))
+
+        # 添加细胞核（小圆点）
+        num_cells = 200
+        for _ in range(num_cells):
+            cx, cy = np.random.randint(10, size-10, 2)
+            radius = np.random.randint(2, 6)
+
+            y, x = np.ogrid[:size, :size]
+            mask = (x - cx)**2 + (y - cy)**2 <= radius**2
+
+            color = np.random.uniform(0.4, 0.7)
+            for c in range(3):
+                img[mask, c] = color + np.random.normal(0, 0.05, mask.sum())
+
+        return np.clip(img, 0, 1)
+
+    elif modality == "Blood":
+        # 血液图像：模拟血细胞
+        size = 128
+        img = np.ones((size, size, 3)) * 0.95  # 浅色背景
+
+        # 添加红细胞（红色圆圈）
+        num_cells = 50
+        for _ in range(num_cells):
+            cx, cy = np.random.randint(10, size-10, 2)
+            radius = np.random.randint(4, 8)
+
+            y, x = np.ogrid[:size, :size]
+            mask = (x - cx)**2 + (y - cy)**2 <= radius**2
+
+            # 红色通道高，其他通道低
+            img[mask, 0] = np.random.uniform(0.7, 0.9, mask.sum())  # R
+            img[mask, 1] = np.random.uniform(0.1, 0.2, mask.sum())  # G
+            img[mask, 2] = np.random.uniform(0.1, 0.2, mask.sum())  # B
+
+        # 添加几个白细胞
+        for _ in range(5):
+            cx, cy = np.random.randint(15, size-15, 2)
+            radius = np.random.randint(8, 12)
+
+            y, x = np.ogrid[:size, :size]
+            mask = (x - cx)**2 + (y - cy)**2 <= radius**2
+
+            img[mask, 0] = np.random.uniform(0.8, 1.0, mask.sum())  # 亮色
+            img[mask, 1] = np.random.uniform(0.8, 1.0, mask.sum())
+            img[mask, 2] = np.random.uniform(0.8, 1.0, mask.sum())
+
+        return np.clip(img, 0, 1)
+
+    elif modality == "NTU":
+        # NTU骨骼数据：模拟3D骨架关键点
+        # 生成25个关键点的3D坐标
+        num_joints = 25
+        joints = np.random.randn(num_joints, 3) * 0.2
+
+        # 添加一些结构（类似人体的骨骼结构）
+        # 躯干中心
+        joints[0] = [0.5, 0.5, 0.5]
+        # 头部
+        joints[1] = [0.5, 0.7, 0.5]
+        # 左臂
+        joints[2:5] = [[0.3, 0.6, 0.5], [0.2, 0.5, 0.5], [0.15, 0.4, 0.5]]
+        # 右臂
+        joints[5:8] = [[0.7, 0.6, 0.5], [0.8, 0.5, 0.5], [0.85, 0.4, 0.5]]
+        # 左腿
+        joints[8:12] = [[0.45, 0.35, 0.5], [0.4, 0.2, 0.5], [0.38, 0.1, 0.5], [0.4, 0.05, 0.5]]
+        # 右腿
+        joints[12:16] = [[0.55, 0.35, 0.5], [0.6, 0.2, 0.5], [0.62, 0.1, 0.5], [0.6, 0.05, 0.5]]
+
+        # 添加一些随机噪声使其更真实
+        joints += np.random.randn(*joints.shape) * 0.02
+
+        return joints.flatten()
+
+    else:
+        # 默认：返回随机图像
+        return np.random.rand(64, 64, 3)
 
 def bytes_preview(b: bytes, n: int = 160) -> str:
     """生成字节预览（十六进制）"""
@@ -952,21 +1114,9 @@ async def get_modality_thumbnail(modality: str):
         # 加载模态数据
         try:
             data = get_data(normalized_name)
-        except FileNotFoundError:
-            # 如果找不到数据文件，尝试使用备用方法
-            print(f"Data file not found for {normalized_name}, trying fallback")
-
-            # 对于图像模态，尝试直接加载
-            if normalized_name in ["Depth", "RGB"]:
-                data_path = DEPTH_PNG_PATH if normalized_name == "Depth" else RGB_PNG_PATH
-                if os.path.exists(data_path):
-                    from PIL import Image
-                    img = Image.open(data_path)
-                    data = np.array(img)
-                else:
-                    raise FileNotFoundError(f"Image file not found: {data_path}")
-            else:
-                raise
+        except FileNotFoundError as e:
+            print(f"Data file not found for {normalized_name}: {e}")
+            return {"thumbnail": None, "error": f"Data not found for {modality}"}
 
         if data is None:
             return {"thumbnail": None, "error": "Modality not found"}
@@ -977,27 +1127,26 @@ async def get_modality_thumbnail(modality: str):
         # 查找模态信息（尝试完整名称和简化名称）
         mod_info = modality_config.get(modality, {}) or modality_config.get(normalized_name, {})
 
-        # 从配置中获取类型，或者根据模态名称推断
+        # 从配置中获取data_type，或者根据模态名称推断
         if isinstance(mod_info, dict):
-            data_type = mod_info.get("type", "sensor")
+            data_type = mod_info.get("data_type", "timeseries")
         else:
             # 根据模态名称推断类型
             if normalized_name in ["Depth", "RGB", "Retina", "Chest", "Path", "Blood"]:
                 data_type = "image"
             elif normalized_name == "NTU":
-                data_type = "skeleton"
+                data_type = "video"
             else:
                 data_type = "timeseries"
 
-        # 生成缩略图
-        modality_type_map = {
-            "timeseries": "timeseries",
-            "image": "image",
-            "medical_image": "image",
-            "skeleton": "skeleton",
-            "sensor": "timeseries"
-        }
-        modality_type = modality_type_map.get(data_type, "timeseries")
+        # 生成缩略图 - 根据data_type选择合适的可视化方式
+        if data_type == "video":
+            # NTU数据使用skeleton可视化
+            modality_type = "skeleton"
+        elif data_type in ["image", "medical_image"]:
+            modality_type = "image"
+        else:
+            modality_type = "timeseries"
 
         thumbnail = generate_thumbnail(data, modality_type)
 
