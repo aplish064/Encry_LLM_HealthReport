@@ -673,8 +673,48 @@ $("ctResPreview").textContent = safeText(s2.aggregate_cipher_preview);
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  console.log('🟢 DOMContentLoaded事件触发');
   setupAnalysisTabs();
-  // 禁用自动刷新，等待用户手动点击"开始分析"
+  // 完全禁用自动刷新 - 只通过用户点击"开始分析"按钮触发
   // runCycle();
   // setInterval(runCycle, 10000000000);
+  console.log('✅ 自动刷新已禁用，不会调用runCycle()');
+
+  // 初始化模态选择器
+  if (typeof ModalitySelector !== 'undefined') {
+    console.log('🔵 开始初始化ModalitySelector');
+    new ModalitySelector();
+  } else {
+    console.error('❌ ModalitySelector未定义，请检查modality-selector.js是否正确加载');
+  }
+
+  // 初始化时清空Step 2和Step 3的内容
+  const modelCluster = document.getElementById('modelCluster');
+  if (modelCluster) {
+    modelCluster.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 40px;">请先选择数据模态，然后点击"开始分析"按钮</div>';
+    console.log('✅ Step 2占位符已设置');
+  }
+
+  const resultTable = document.querySelector('#resultTable tbody');
+  if (resultTable) {
+    resultTable.innerHTML = '<tr><td colspan="4" style="text-align:center; color: #9ca3af; padding: 20px;">请先选择数据模态并点击"开始分析"</td></tr>';
+    console.log('✅ Step 3占位符已设置');
+  }
+
+  const resultsTitle = document.getElementById('resultsTitle');
+  if (resultsTitle) {
+    resultsTitle.textContent = 'Key results (waiting for analysis)';
+  }
+
+  const recommendPanel = document.getElementById('recommendPanel');
+  if (recommendPanel) {
+    recommendPanel.innerHTML = '请先选择数据模态并点击"开始分析"';
+  }
+
+  const conclusionPanel = document.getElementById('conclusionPanel');
+  if (conclusionPanel) {
+    conclusionPanel.innerHTML = '请先选择数据模态并点击"开始分析"';
+  }
+
+  console.log('✅ 页面初始化完成');
 });

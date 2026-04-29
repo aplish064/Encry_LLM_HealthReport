@@ -13,15 +13,15 @@
   background: white;
   border: 2px solid #e5e7eb;
   border-radius: 8px;
-  padding: 16px;
+  padding: 10px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
   opacity: 0.6;
-  min-height: 140px;
+  min-height: 150px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .modality-card:hover {
@@ -36,16 +36,16 @@
 }
 
 .card-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
+  font-size: 42px;
+  margin-bottom: 6px;
   line-height: 1;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
-/* 加载动画占位符 */
+/* 加载动画占位符 - 优化尺寸 */
 .card-loading {
   width: 100%;
-  height: 120px;
+  height: 65px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -53,7 +53,8 @@
   background-size: 200% 100%;
   animation: loading 1.5s infinite;
   border-radius: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
+  border: 1px solid #e5e7eb;
 }
 
 @keyframes loading {
@@ -65,35 +66,41 @@
   }
 }
 
+/* 缩略图 - 优化尺寸和显示效果 */
 .card-thumbnail {
   width: 100%;
-  height: 120px;
+  height: 65px;
   object-fit: cover;
   border-radius: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s ease;
+  border: 1px solid #e5e7eb;
 }
 
 .modality-card:hover .card-thumbnail {
   transform: scale(1.05);
+  border-color: #3b82f6;
 }
 
+/* 卡片标题 - 显示在最上方 */
 .card-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #1f2937;
   margin-bottom: 6px;
+  margin-top: 0;
 }
 
 .card-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: #6b7280;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  line-height: 1.4;
+  line-height: 1.3;
+  margin-top: 4px;
 }
 
 /* 操作栏 */

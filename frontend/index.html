@@ -5,22 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Secure Multimodal HE + LLM Demo</title>
   <link rel="stylesheet" href="./assets/css/styles.css"/>
-  <link rel="stylesheet" href="./assets/css/enhancement.css"/>
+  <link rel="stylesheet" href="./assets/css/enhancement.css?v=2"/>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <div class="brandmark"></div>
-      <div>
-        <div class="title">Homomorphic Secure Inference Demo</div>
-        <div class="subtitle">Local multimodal sensing → Encrypt → DeepSeek dispatch → Homomorphic model cluster → Clinical report</div>
-      </div>
-    </div>
-    <div class="controls">
-      <span class="pill mono" id="cycleMeta">Auto refresh: 10s</span>
-    </div>
-  </header>
-
   <main class="container">
     <section class="grid grid3">
       <!-- Step 1 -->
@@ -128,7 +115,7 @@
         <div class="cardBody">
           <!-- Single column layout: Key results -> Recommendations -> Conclusion -->
           <div class="resultsSection">
-            <div class="subTitle">Key results (partial)</div>
+            <div class="subTitle" id="resultsTitle">Key results</div>
             <div class="resultTableWrap">
               <table class="resultTable" id="resultTable">
                 <thead>
@@ -160,7 +147,7 @@
     </section>
   </main>
 
-  <script src="./assets/js/modality-selector.js?v=1"></script>
-  <script src="./assets/js/app.js?v=9"></script>
+  <script src="./assets/js/modality-selector.js?v=9"></script>
+  <script src="./assets/js/app.js?v=17"></script>
 </body>
 </html>

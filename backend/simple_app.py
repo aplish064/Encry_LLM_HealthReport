@@ -55,7 +55,7 @@ MODALITY_NAME_MAP = {
     "IMU Sensor": "IMU",
     "WiFi CSI": "CSI",
     "RGB Camera": "RGB",
-    "NTU RGB+D": "NTU",
+    "NTU": "NTU",
     "RetinaMNIST": "Retina",
     "ChestMNIST": "Chest",
     "PathMNIST": "Path",
@@ -77,6 +77,11 @@ CLUSTER_MODELS = [
     {"id": "sleep", "title": "Sleep Staging", "subtitle": "Depth-based Model"},
     {"id": "metabolic", "title": "Metabolic Score", "subtitle": "IMU Proxy"},
     {"id": "risk", "title": "Risk Assessment", "subtitle": "RGB Triage"},
+    {"id": "action", "title": "Action Recognition", "subtitle": "Skeleton Model"},
+    {"id": "cardio", "title": "Cardiovascular", "subtitle": "Retina Analysis"},
+    {"id": "lung", "title": "Lung Screening", "subtitle": "X-ray Analysis"},
+    {"id": "cancer", "title": "Cancer Detection", "subtitle": "Pathology Model"},
+    {"id": "blood", "title": "Blood Analysis", "subtitle": "Hematology Model"},
 ]
 
 app = FastAPI(title="Secure Multimodal HE + LLM Demo", version="3.1")
@@ -1095,7 +1100,7 @@ async def get_modalities():
                 {"id": "imu", "name": "IMU传感器", "type": "timeseries", "description": "步态分析、代谢评估", "icon": "🏃"},
                 {"id": "csi", "name": "CSI信号", "type": "timeseries", "description": "心率、呼吸监测", "icon": "📶"},
                 {"id": "rgb", "name": "RGB图像", "type": "image", "description": "风险评分、跌倒检测", "icon": "📷"},
-                {"id": "ntu", "name": "NTU骨骼", "type": "skeleton", "description": "动作识别、行为分析", "icon": "🦴"},
+                {"id": "ntu", "name": "NTU", "type": "skeleton", "description": "动作识别、行为分析", "icon": "🦴"},
                 {"id": "retina", "name": "视网膜图像", "type": "medical_image", "description": "心血管疾病早期预警", "icon": "👁️"},
                 {"id": "chest", "name": "胸部X光", "type": "medical_image", "description": "肺部疾病筛查", "icon": "🫁"},
                 {"id": "path", "name": "组织病理", "type": "medical_image", "description": "癌症筛查", "icon": "🔬"},
@@ -1171,14 +1176,31 @@ async def run_cycle(selected_modalities: Optional[str] = None):
     # Load modality configuration
     modality_config = load_modality_config()
 
+    # Create ID to name mapping for compatibility
+    id_to_name = {}
+    for mod_name, mod_config in modality_config.items():
+        mod_id = mod_config.get("id", "")
+        if mod_id:
+            id_to_name[mod_id] = mod_name
+
     # Parse selected modalities if provided
     enabled_modalities = []
     if selected_modalities:
         requested = [m.strip() for m in selected_modalities.split(",")]
         for mod in requested:
+            # Try to match by name first, then by ID
+            matched = False
             if mod in modality_config and modality_config[mod].get("enabled", True):
                 enabled_modalities.append(mod)
-            else:
+                matched = True
+            elif mod in id_to_name:
+                # Convert ID to name
+                mod_name = id_to_name[mod]
+                if modality_config[mod_name].get("enabled", True):
+                    enabled_modalities.append(mod_name)
+                    matched = True
+
+            if not matched:
                 print(f"Warning: Modality {mod} not found or disabled")
 
         # Fallback: if no valid modalities, load all enabled
@@ -1270,6 +1292,47 @@ async def run_cycle(selected_modalities: Optional[str] = None):
                 "plaintext_excerpt": "RGB image for risk assessment"
             }
 
+        # 新增的5种医学图像模态
+        if "NTU" in enabled_modalities:
+            step1_modalities["NTU"] = {
+                "kind": "image",
+                "shape": "skeleton",
+                "preview_png": generate_thumbnail(_generate_medical_image_sample("NTU"), "skeleton"),
+                "plaintext_excerpt": "Skeleton data for action recognition"
+            }
+
+        if "Retina" in enabled_modalities:
+            step1_modalities["Retina"] = {
+                "kind": "image",
+                "shape": "224×224×3",
+                "preview_png": generate_thumbnail(_generate_medical_image_sample("Retina"), "medical_image"),
+                "plaintext_excerpt": "Retinal fundus image for cardiovascular screening"
+            }
+
+        if "Chest" in enabled_modalities:
+            step1_modalities["Chest"] = {
+                "kind": "image",
+                "shape": "224×224×3",
+                "preview_png": generate_thumbnail(_generate_medical_image_sample("Chest"), "medical_image"),
+                "plaintext_excerpt": "Chest X-ray for lung disease screening"
+            }
+
+        if "Path" in enabled_modalities:
+            step1_modalities["Path"] = {
+                "kind": "image",
+                "shape": "224×224×3",
+                "preview_png": generate_thumbnail(_generate_medical_image_sample("Path"), "medical_image"),
+                "plaintext_excerpt": "Pathology image for cancer detection"
+            }
+
+        if "Blood" in enabled_modalities:
+            step1_modalities["Blood"] = {
+                "kind": "image",
+                "shape": "224×224×3",
+                "preview_png": generate_thumbnail(_generate_medical_image_sample("Blood"), "medical_image"),
+                "plaintext_excerpt": "Blood cell image for hematology analysis"
+            }
+
         step1_data = {
             "time_sec": step1_time,
             "modalities": step1_modalities,
@@ -1296,23 +1359,43 @@ async def run_cycle(selected_modalities: Optional[str] = None):
         # 聚合密文
         agg_bytes = enc_uwb.serialize() + enc_imu.serialize()[:100]
 
-        # LLM智能分配 (only for enabled modalities)
+        # LLM智能分配 (支持所有10种模态，使用完整模态名称)
         assignments = []
-        if "CSI" in enabled_modalities:
-            assignments.append({"input_modality": "CSI", "model_id": "ecg", "tool": "secure_ecg_toolbox"})
-        if "UWB" in enabled_modalities:
-            assignments.append({"input_modality": "UWB", "model_id": "bp", "tool": "secure_bp_toolbox"})
-        if "IMU" in enabled_modalities:
-            assignments.append({"input_modality": "IMU", "model_id": "sleep", "tool": "secure_sleep_toolbox"})
-            assignments.append({"input_modality": "IMU", "model_id": "metabolic", "tool": "secure_metabolic_toolbox"})
-        if "RGB" in enabled_modalities:
-            assignments.append({"input_modality": "RGB", "model_id": "risk", "tool": "secure_risk_toolbox"})
+        if "WiFi CSI" in enabled_modalities or "CSI" in enabled_modalities:
+            mod_name = "WiFi CSI" if "WiFi CSI" in enabled_modalities else "CSI"
+            assignments.append({"input_modality": mod_name, "model_id": "ecg", "tool": "secure_ecg_toolbox"})
+        if "UWB Radar" in enabled_modalities or "UWB" in enabled_modalities:
+            mod_name = "UWB Radar" if "UWB Radar" in enabled_modalities else "UWB"
+            assignments.append({"input_modality": mod_name, "model_id": "bp", "tool": "secure_bp_toolbox"})
+        if "Depth Camera" in enabled_modalities or "Depth" in enabled_modalities:
+            mod_name = "Depth Camera" if "Depth Camera" in enabled_modalities else "Depth"
+            assignments.append({"input_modality": mod_name, "model_id": "sleep", "tool": "secure_sleep_toolbox"})
+        if "IMU Sensor" in enabled_modalities or "IMU" in enabled_modalities:
+            mod_name = "IMU Sensor" if "IMU Sensor" in enabled_modalities else "IMU"
+            assignments.append({"input_modality": mod_name, "model_id": "metabolic", "tool": "secure_metabolic_toolbox"})
+        if "RGB Camera" in enabled_modalities or "RGB" in enabled_modalities:
+            mod_name = "RGB Camera" if "RGB Camera" in enabled_modalities else "RGB"
+            assignments.append({"input_modality": mod_name, "model_id": "risk", "tool": "secure_risk_toolbox"})
+        if "NTU" in enabled_modalities:
+            assignments.append({"input_modality": "NTU", "model_id": "action", "tool": "secure_action_toolbox"})
+        if "RetinaMNIST" in enabled_modalities or "Retina" in enabled_modalities:
+            mod_name = "RetinaMNIST" if "RetinaMNIST" in enabled_modalities else "Retina"
+            assignments.append({"input_modality": mod_name, "model_id": "cardio", "tool": "secure_cardio_toolbox"})
+        if "ChestMNIST" in enabled_modalities or "Chest" in enabled_modalities:
+            mod_name = "ChestMNIST" if "ChestMNIST" in enabled_modalities else "Chest"
+            assignments.append({"input_modality": mod_name, "model_id": "lung", "tool": "secure_lung_toolbox"})
+        if "PathMNIST" in enabled_modalities or "Path" in enabled_modalities:
+            mod_name = "PathMNIST" if "PathMNIST" in enabled_modalities else "Path"
+            assignments.append({"input_modality": mod_name, "model_id": "cancer", "tool": "secure_cancer_toolbox"})
+        if "BloodMNIST" in enabled_modalities or "Blood" in enabled_modalities:
+            mod_name = "BloodMNIST" if "BloodMNIST" in enabled_modalities else "Blood"
+            assignments.append({"input_modality": mod_name, "model_id": "blood", "tool": "secure_blood_toolbox"})
 
         # Fallback: if no modalities selected, use default assignment
         if not assignments:
             assignments = [
-                {"input_modality": "CSI", "model_id": "ecg", "tool": "secure_ecg_toolbox"},
-                {"input_modality": "UWB", "model_id": "bp", "tool": "secure_bp_toolbox"},
+                {"input_modality": "WiFi CSI", "model_id": "ecg", "tool": "secure_ecg_toolbox"},
+                {"input_modality": "UWB Radar", "model_id": "bp", "tool": "secure_bp_toolbox"},
             ]
 
         # 模拟推理结果 - 使用正确的数据结构
@@ -1337,6 +1420,21 @@ async def run_cycle(selected_modalities: Optional[str] = None):
             elif a["model_id"] == "risk":
                 score = 0.25
                 status = "low"
+            elif a["model_id"] == "action":
+                score = 92.5
+                status = "good"
+            elif a["model_id"] == "cardio":
+                score = 88.0
+                status = "normal"
+            elif a["model_id"] == "lung":
+                score = 94.2
+                status = "good"
+            elif a["model_id"] == "cancer":
+                score = 15.8
+                status = "low"
+            elif a["model_id"] == "blood":
+                score = 91.5
+                status = "normal"
             else:
                 score = 50.0
                 status = "unknown"

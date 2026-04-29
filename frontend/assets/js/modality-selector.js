@@ -16,6 +16,7 @@ class ModalitySelector {
   }
 
   async init() {
+    console.log('🔵 ModalitySelector初始化开始');
     try {
       this.setLoadingState(true);
       await this.loadModalities();
@@ -24,9 +25,11 @@ class ModalitySelector {
       this.attachEventListeners();
 
       // 初始化Step 2模型集群（显示所有10个模型，但都变暗）
+      console.log('🔵 调用updateModelCluster进行初始化');
       this.updateModelCluster();
+      console.log('✅ ModalitySelector初始化完成');
     } catch (error) {
-      console.error('模态选择器初始化失败:', error);
+      console.error('❌ 模态选择器初始化失败:', error);
       this.showError('初始化失败，请刷新页面重试');
     } finally {
       this.setLoadingState(false);
@@ -236,8 +239,8 @@ class ModalitySelector {
       }
 
       card.innerHTML = `
-        ${iconDisplay}
         <div class="card-title">${modality.name}</div>
+        ${iconDisplay}
         <div class="card-desc">${modality.description}</div>
       `;
 
@@ -269,11 +272,13 @@ class ModalitySelector {
 
   handleCardClick(card) {
     const modalityId = card.dataset.modalityId;
+    console.log(`🟢 卡片点击: ${modalityId}`);
 
     if (this.selectedModalities.has(modalityId)) {
       // 取消选择
       this.selectedModalities.delete(modalityId);
       card.classList.remove('active');
+      console.log(`❌ 取消选择: ${modalityId}`);
     } else {
       // 检查是否超过最大选择数
       if (this.selectedModalities.size >= this.maxSelection) {
@@ -284,9 +289,12 @@ class ModalitySelector {
       // 添加选择
       this.selectedModalities.add(modalityId);
       card.classList.add('active');
+      console.log(`✅ 添加选择: ${modalityId}`);
     }
 
     this.updateUI();
+    console.log('🔄 调用updateModelCluster更新模型高亮');
+    this.updateModelCluster(); // 更新Step 2模型高亮
   }
 
   updateUI() {
@@ -308,55 +316,57 @@ class ModalitySelector {
 
   updateModelCluster() {
     // 根据选中的模态更新Step 2的Homomorphic Prediction Model Cluster
-    // 始终显示所有10个模型，选中的高亮(不透明)，未选中的变暗
+    // 始终显示所有10个模型，选中的高亮(active)，未选中的变暗(inactive)
     const clusterGrid = document.getElementById('modelCluster');
     if (!clusterGrid) {
-      console.warn('modelCluster element not found');
+      console.warn('⚠️ modelCluster element not found');
       return;
     }
 
     // 模态ID到工具的映射关系（使用小写ID）
-    const modalityToolMap = {
-      'depth': { id: 'sleep', title: 'Sleep Staging', subtitle: 'Depth-based Model' },
-      'uwb': { id: 'bp', title: 'Blood Pressure', subtitle: 'UWB Regression' },
-      'imu': { id: 'metabolic', title: 'Metabolic Score', subtitle: 'IMU Proxy' },
-      'csi': { id: 'ecg', title: 'ECG Arrhythmia', subtitle: 'CSI Heart Pattern' },
-      'rgb': { id: 'risk', title: 'Risk Assessment', subtitle: 'RGB Triage' },
-      'ntu': { id: 'action', title: 'Action Recognition', subtitle: 'Skeleton Model' },
-      'retina': { id: 'cardio', title: 'Cardiovascular', subtitle: 'Retina Analysis' },
-      'chest': { id: 'lung', title: 'Lung Screening', subtitle: 'X-ray Analysis' },
-      'path': { id: 'cancer', title: 'Cancer Detection', subtitle: 'Pathology Model' },
-      'blood': { id: 'blood', title: 'Blood Analysis', subtitle: 'Hematology Model' }
-    };
+    const clusterModels = [
+      { id: 'sleep', title: 'Sleep Staging', subtitle: 'Depth-based Model', modalityId: 'depth' },
+      { id: 'bp', title: 'Blood Pressure', subtitle: 'UWB Regression', modalityId: 'uwb' },
+      { id: 'metabolic', title: 'Metabolic Score', subtitle: 'IMU Proxy', modalityId: 'imu' },
+      { id: 'ecg', title: 'ECG Arrhythmia', subtitle: 'CSI Heart Pattern', modalityId: 'csi' },
+      { id: 'risk', title: 'Risk Assessment', subtitle: 'RGB Triage', modalityId: 'rgb' },
+      { id: 'action', title: 'Action Recognition', subtitle: 'Skeleton Model', modalityId: 'ntu' },
+      { id: 'cardio', title: 'Cardiovascular', subtitle: 'Retina Analysis', modalityId: 'retina' },
+      { id: 'lung', title: 'Lung Screening', subtitle: 'X-ray Analysis', modalityId: 'chest' },
+      { id: 'cancer', title: 'Cancer Detection', subtitle: 'Pathology Model', modalityId: 'path' },
+      { id: 'blood', title: 'Blood Analysis', subtitle: 'Hematology Model', modalityId: 'blood' }
+    ];
 
-    // 只在第一次初始化时创建所有模型卡片
-    if (clusterGrid.children.length === 0) {
-      Object.keys(modalityToolMap).forEach(modalityId => {
-        const tool = modalityToolMap[modalityId];
-        const toolCard = document.createElement('div');
-        toolCard.className = 'clusterCard';
-        toolCard.id = `model-${modalityId}`;
-        toolCard.style.opacity = '0.3';
-        toolCard.style.transition = 'opacity 0.3s ease';
+    // 清空并重新创建所有模型卡片（使用与app.js相同的HTML结构）
+    clusterGrid.innerHTML = '';
 
-        toolCard.innerHTML = `
-          <div class="clusterCardTitle">${tool.title}</div>
-          <div class="clusterCardSubtitle">${tool.subtitle}</div>
-        `;
-        clusterGrid.appendChild(toolCard);
-      });
-    }
+    clusterModels.forEach(model => {
+      const card = document.createElement('div');
+      const isSelected = this.selectedModalities.has(model.modalityId);
+      card.className = `modelCard ${isSelected ? 'active' : 'inactive'}`;
 
-    // 更新所有模型的透明度
-    Object.keys(modalityToolMap).forEach(modalityId => {
-      const toolCard = document.getElementById(`model-${modalityId}`);
-      if (toolCard) {
-        const isSelected = this.selectedModalities.has(modalityId);
-        toolCard.style.opacity = isSelected ? '1' : '0.3';
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'modelName';
+      nameDiv.textContent = model.title;
+
+      const subDiv = document.createElement('div');
+      subDiv.className = 'modelSub';
+      subDiv.textContent = model.subtitle;
+
+      card.appendChild(nameDiv);
+      card.appendChild(subDiv);
+
+      if (isSelected) {
+        const badgeDiv = document.createElement('div');
+        badgeDiv.className = 'modelBadge';
+        badgeDiv.textContent = `${model.modalityId.toUpperCase()} → ${model.id}`;
+        card.appendChild(badgeDiv);
       }
+
+      clusterGrid.appendChild(card);
     });
 
-    console.log('Updated model cluster, selected:', Array.from(this.selectedModalities));
+    console.log('✅ 模型集群已更新, 选中模态:', Array.from(this.selectedModalities));
   }
 
   showWarning(message) {
@@ -365,17 +375,27 @@ class ModalitySelector {
   }
 
   async launchAnalysis() {
+    console.log('🚀 launchAnalysis被调用');
     if (this.selectedModalities.size === 0) {
+      console.warn('⚠️ 没有选择任何模态，取消分析');
       this.showWarning('请至少选择一种模态');
       return;
     }
 
     if (this.isLoading) {
+      console.warn('⚠️ 正在处理中，忽略重复调用');
       this.showWarning('正在处理中，请稍候...');
       return;
     }
 
+    // 重置结果标题
+    const resultsTitle = document.getElementById('resultsTitle');
+    if (resultsTitle) {
+      resultsTitle.textContent = `Key results (analyzing ${this.selectedModalities.size} modalities...)`;
+    }
+
     const selectedList = Array.from(this.selectedModalities).join(',');
+    console.log(`📋 开始分析以下模态: ${selectedList}`);
 
     try {
       this.setLoadingState(true);
@@ -483,7 +503,7 @@ class ModalitySelector {
     if (analyzeBtn) {
       if (loading) {
         analyzeBtn.disabled = true;
-        analyzeBtn.textContent = '处理中...';
+        analyzeBtn.textContent = '分析中...';
         analyzeBtn.style.opacity = '0.6';
       } else {
         analyzeBtn.disabled = this.selectedModalities.size === 0;
@@ -492,10 +512,40 @@ class ModalitySelector {
       }
     }
 
-    // 显示/隐藏加载遮罩
-    const spinnerOverlay = document.getElementById('spinUpload');
-    if (spinnerOverlay) {
-      spinnerOverlay.style.display = loading ? 'flex' : 'none';
+    // 隐藏Step 1的加载遮罩（不再使用）
+    const uploadSpinner = document.getElementById('spinUpload');
+    if (uploadSpinner) {
+      uploadSpinner.style.display = 'none';
+    }
+
+    // 在Clinical Report Generation区域显示加载状态
+    const reportSpinner = document.getElementById('spinDecrypt');
+    if (reportSpinner) {
+      if (loading) {
+        // 更新文本显示当前处理状态
+        const spinnerText = reportSpinner.querySelector('.spinText');
+        if (spinnerText) {
+          spinnerText.textContent = '正在生成临床报告...';
+        }
+        reportSpinner.style.display = 'flex';
+      } else {
+        reportSpinner.style.display = 'none';
+      }
+    }
+
+    // 同时更新Step 3的状态标签
+    const tDecrypt = document.getElementById('tDecrypt');
+    if (tDecrypt) {
+      if (loading) {
+        tDecrypt.className = 'pill running';
+        tDecrypt.textContent = 'Generating';
+      } else {
+        // 保持完成后状态或重置
+        if (!tDecrypt.textContent.includes('Done') && !tDecrypt.textContent.includes('sec')) {
+          tDecrypt.className = 'pill';
+          tDecrypt.textContent = '—';
+        }
+      }
     }
   }
 
@@ -609,16 +659,41 @@ class ModalitySelector {
     // 调用app.js中的渲染函数来更新UI
     console.log('Rendering results with data:', data);
 
+    // 更新Step 3状态为完成
+    const tDecrypt = document.getElementById('tDecrypt');
+    if (tDecrypt && data.step3) {
+      const timeSec = data.step3.time_sec || 0;
+      tDecrypt.className = 'pill success';
+      tDecrypt.textContent = `Done (${timeSec.toFixed(1)}s)`;
+      console.log(`✅ Step 3 status updated: Done (${timeSec.toFixed(1)}s)`);
+    }
+
     // Step 1: 渲染模态数据
     if (typeof renderModalities === 'function') {
       renderModalities(data.step1?.modalities || {});
       console.log('✅ Rendered modalities');
+
+      // 更新Step 1状态为完成
+      const tUpload = document.getElementById('tUpload');
+      if (tUpload && data.step1 && data.step1.time_sec !== undefined) {
+        tUpload.className = 'pill success';
+        tUpload.textContent = `Done (${data.step1.time_sec.toFixed(2)}s)`;
+        console.log(`✅ Step 1 status updated: Done (${data.step1.time_sec.toFixed(2)}s)`);
+      }
     }
 
     // Step 2: 渲染模型集群和密文预览
     if (typeof renderCluster === 'function') {
       const s2 = data.step2 || {};
       renderCluster(s2.cluster_models || [], s2.assignments || []);
+
+      // 更新Step 2状态为完成
+      const tDispatch = document.getElementById('tDispatch');
+      if (tDispatch && s2.time_sec !== undefined) {
+        tDispatch.className = 'pill success';
+        tDispatch.textContent = `Done (${s2.time_sec.toFixed(1)}s)`;
+        console.log(`✅ Step 2 status updated: Done (${s2.time_sec.toFixed(1)}s)`);
+      }
 
       // 更新密文预览
       const ctPreview = document.getElementById('ctResPreview');
@@ -633,6 +708,19 @@ class ModalitySelector {
       const s3 = data.step3 || {};
       renderResults(s3.results || []);
       console.log('✅ Rendered results');
+
+      // 动态更新结果标题
+      const resultsTitle = document.getElementById('resultsTitle');
+      if (resultsTitle) {
+        if (s3.results && s3.results.length > 0) {
+          const count = s3.results.length;
+          const modalityNames = s3.results.map(r => r.input_modality).join(', ');
+          resultsTitle.textContent = `Key results (${count} modalities: ${modalityNames})`;
+          console.log(`✅ Results title updated: ${resultsTitle.textContent}`);
+        } else {
+          resultsTitle.textContent = 'Key results (no data)';
+        }
+      }
 
       // 渲染报告
       if (typeof renderHealthReport === 'function' && s3.report) {
@@ -697,7 +785,7 @@ class ModalitySelector {
   }
 }
 
-// 初始化模态选择器
-document.addEventListener('DOMContentLoaded', () => {
-  new ModalitySelector();
-});
+// 不自动初始化，等待app.js调用
+// document.addEventListener('DOMContentLoaded', () => {
+//   new ModalitySelector();
+// });
