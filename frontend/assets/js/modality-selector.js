@@ -288,25 +288,25 @@ class ModalitySelector {
     // 清空现有内容
     clusterGrid.innerHTML = '';
 
-    // 模态名称到工具的映射关系（使用完整名称）
+    // 模态ID到工具的映射关系（使用小写ID）
     const modalityToolMap = {
-      'Depth Camera': { id: 'sleep', title: 'Sleep Staging', subtitle: 'Depth-based Model', icon: '🛏️' },
-      'UWB Radar': { id: 'bp', title: 'Blood Pressure', subtitle: 'UWB Regression', icon: '📡' },
-      'IMU Sensor': { id: 'metabolic', title: 'Metabolic Score', subtitle: 'IMU Proxy', icon: '🏃' },
-      'WiFi CSI': { id: 'ecg', title: 'ECG Arrhythmia', subtitle: 'CSI Heart Pattern', icon: '📶' },
-      'RGB Camera': { id: 'risk', title: 'Risk Assessment', subtitle: 'RGB Triage', icon: '📷' },
-      'NTU RGB+D': { id: 'action', title: 'Action Recognition', subtitle: 'Skeleton Model', icon: '🦴' },
-      'RetinaMNIST': { id: 'cardio', title: 'Cardiovascular', subtitle: 'Retina Analysis', icon: '👁️' },
-      'ChestMNIST': { id: 'lung', title: 'Lung Screening', subtitle: 'X-ray Analysis', icon: '🫁' },
-      'PathMNIST': { id: 'cancer', title: 'Cancer Detection', subtitle: 'Pathology Model', icon: '🔬' },
-      'BloodMNIST': { id: 'blood', title: 'Blood Analysis', subtitle: 'Hematology Model', icon: '🩸' }
+      'depth': { id: 'sleep', title: 'Sleep Staging', subtitle: 'Depth-based Model', icon: '🛏️' },
+      'uwb': { id: 'bp', title: 'Blood Pressure', subtitle: 'UWB Regression', icon: '📡' },
+      'imu': { id: 'metabolic', title: 'Metabolic Score', subtitle: 'IMU Proxy', icon: '🏃' },
+      'csi': { id: 'ecg', title: 'ECG Arrhythmia', subtitle: 'CSI Heart Pattern', icon: '📶' },
+      'rgb': { id: 'risk', title: 'Risk Assessment', subtitle: 'RGB Triage', icon: '📷' },
+      'ntu': { id: 'action', title: 'Action Recognition', subtitle: 'Skeleton Model', icon: '🦴' },
+      'retina': { id: 'cardio', title: 'Cardiovascular', subtitle: 'Retina Analysis', icon: '👁️' },
+      'chest': { id: 'lung', title: 'Lung Screening', subtitle: 'X-ray Analysis', icon: '🫁' },
+      'path': { id: 'cancer', title: 'Cancer Detection', subtitle: 'Pathology Model', icon: '🔬' },
+      'blood': { id: 'blood', title: 'Blood Analysis', subtitle: 'Hematology Model', icon: '🩸' }
     };
 
     console.log('Selected modalities:', Array.from(this.selectedModalities));
 
     // 为每个选中的模态创建工具卡片
-    this.selectedModalities.forEach(modalityName => {
-      const tool = modalityToolMap[modalityName];
+    this.selectedModalities.forEach(modalityId => {
+      const tool = modalityToolMap[modalityId];
       if (tool) {
         const toolCard = document.createElement('div');
         toolCard.className = 'clusterCard';
@@ -316,9 +316,9 @@ class ModalitySelector {
           <div class="clusterCardSubtitle">${tool.subtitle}</div>
         `;
         clusterGrid.appendChild(toolCard);
-        console.log(`Added tool card for ${modalityName}:`, tool);
+        console.log(`Added tool card for ${modalityId}:`, tool);
       } else {
-        console.warn(`No tool mapping found for ${modalityName}`);
+        console.warn(`No tool mapping found for ${modalityId}`);
       }
     });
 
