@@ -33,6 +33,13 @@ DEPTH_PNG_PATH = os.path.join(ASSET_USER_DIR, "deep2.png")
 RGB_PNG_PATH = os.path.join(ASSET_USER_DIR, "RGB.png")
 
 _DATA_CACHE: Dict[str, np.ndarray] = {}
+MODALITY_CONFIG = {
+    "Depth": {"enabled": True, "file": DEPTH_PNG_PATH},
+    "UWB": {"enabled": True, "file": DATA_PATHS["UWB"]},
+    "IMU": {"enabled": True, "file": DATA_PATHS["IMU"]},
+    "CSI": {"enabled": True, "file": DATA_PATHS["CSI"]},
+    "RGB": {"enabled": True, "file": RGB_PNG_PATH},
+}
 
 # 智谱AI配置
 ZHIPU_API_KEY = "3e53672cccc548629e749d7436098975.yVFwqfG0ATQ69Ro4"
@@ -66,12 +73,58 @@ def png_b64_from_plt(fig, pad_inches: float = 0.06) -> str:
     plt.close(fig)
     return b64e(bio.getvalue())
 
+def generate_thumbnail(data: np.ndarray, modality_type: str, size=(64, 64)) -> str:
+    """生成预览缩略图"""
+    try:
+        fig = plt.figure(figsize=(size[0]/100, size[1]/100), dpi=100)
+
+        if modality_type == 'timeseries':
+            # 时序数据：显示前50个点
+            if data.ndim == 1:
+                plt.plot(data[:50], linewidth=1, color='#3b82f6')
+            else:
+                plt.plot(data[:50, 0], linewidth=1, color='#3b82f6')
+        elif modality_type == 'skeleton':
+            # 骨骼数据：显示简单轮廓
+            plt.scatter(data[::3], data[1::3], c='#3b82f6', s=10)
+        elif modality_type in ['image', 'medical_image']:
+            # 图像数据：调整大小显示
+            from PIL import Image
+            if data.ndim == 3:
+                img = data[0] if data.shape[0] < 100 else data
+            else:
+                img = data
+            img_pil = Image.fromarray((img * 255).astype(np.uint8))
+            img_pil = img_pil.resize(size)
+            plt.imshow(img_pil, cmap='gray')
+
+        plt.axis('off')
+        plt.tight_layout(pad=0)
+
+        return png_b64_from_plt(fig)
+    except Exception as e:
+        print(f"缩略图生成失败: {e}")
+        return ""
+
 def png_b64_from_file(path: str) -> Optional[str]:
     try:
         with open(path, "rb") as f:
             return b64e(f.read())
     except Exception:
         return None
+
+def load_modality_config() -> Dict[str, Any]:
+    """Load modality configuration from config.json or return default config."""
+    config_path = os.path.join(BASE_DIR, "backend", "config.json")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+                return config.get("modalities", MODALITY_CONFIG)
+        except Exception as e:
+            print(f"Warning: Failed to load config from {config_path}: {e}")
+            return MODALITY_CONFIG
+    return MODALITY_CONFIG
 
 def _load_csv_matrix(path: str) -> np.ndarray:
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
@@ -740,79 +793,121 @@ async def health_check():
     return {"status": "healthy", "version": "3.1-complete", "timestamp": time.time()}
 
 @app.get("/api/cycle")
-async def run_cycle():
-    """执行完整的数据处理周期"""
+async def run_cycle(selected_modalities: Optional[str] = None):
+    """执行完整的数据处理周期 - 支持选择性模态加载
+
+    Args:
+        selected_modalities: Optional comma-separated list of modalities to load
+                           Example: "UWB,IMU,CSI" or "Depth,RGB"
+    """
     start_time = time.time()
+
+    # Load modality configuration
+    modality_config = load_modality_config()
+
+    # Parse selected modalities if provided
+    enabled_modalities = []
+    if selected_modalities:
+        requested = [m.strip() for m in selected_modalities.split(",")]
+        for mod in requested:
+            if mod in modality_config and modality_config[mod].get("enabled", True):
+                enabled_modalities.append(mod)
+            else:
+                print(f"Warning: Modality {mod} not found or disabled")
+
+        # Fallback: if no valid modalities, load all enabled
+        if not enabled_modalities:
+            print("No valid modalities provided, loading all enabled modalities")
+            enabled_modalities = [mod for mod, cfg in modality_config.items() if cfg.get("enabled", True)]
+    else:
+        # Default: load all enabled modalities
+        enabled_modalities = [mod for mod, cfg in modality_config.items() if cfg.get("enabled", True)]
+
+    print(f"Enabled modalities for this cycle: {enabled_modalities}")
 
     # Step 1: 数据收集
     step1_start = time.time()
     try:
-        uwb_data = get_data("UWB")
-        imu_data = get_data("IMU")
-        csi_data = get_data("CSI")
+        # Only load selected modalities
+        uwb_data = get_data("UWB") if "UWB" in enabled_modalities else None
+        imu_data = get_data("IMU") if "IMU" in enabled_modalities else None
+        csi_data = get_data("CSI") if "CSI" in enabled_modalities else None
 
-        # 重塑数据
-        uwb_series = uwb_data.reshape(-1, 3)
-        imu_series = imu_data.reshape(-1, 6)
-        csi_series = csi_data[:, 1:]
+        # 重塑数据 (only for loaded modalities)
+        uwb_series = uwb_data.reshape(-1, 3) if uwb_data is not None else None
+        imu_series = imu_data.reshape(-1, 6) if imu_data is not None else None
+        csi_series = csi_data[:, 1:] if csi_data is not None else None
 
-        # 生成增强的多通道预览图
-        uwb_preview = plot_multichannel_preview(uwb_series, "UWB Multichannel Analysis (3 Channels)", max_channels=3)
-        imu_preview = plot_multichannel_preview(imu_series, "IMU Multichannel Analysis (6 Channels)", max_channels=6)
-        csi_preview = plot_multichannel_preview(csi_series, "CSI Multichannel Analysis (8 Channels)", max_channels=8)
+        # 生成增强的多通道预览图 (only for loaded modalities)
+        uwb_preview = plot_multichannel_preview(uwb_series, "UWB Multichannel Analysis (3 Channels)", max_channels=3) if uwb_series is not None else ""
+        imu_preview = plot_multichannel_preview(imu_series, "IMU Multichannel Analysis (6 Channels)", max_channels=6) if imu_series is not None else ""
+        csi_preview = plot_multichannel_preview(csi_series, "CSI Multichannel Analysis (8 Channels)", max_channels=8) if csi_series is not None else ""
 
-        # 生成增强的FFT频谱图
-        uwb_fft = plot_fft_spectrum(uwb_series, "UWB Frequency Spectrum Analysis", fs=24.0)
-        imu_fft = plot_fft_spectrum(imu_series, "IMU Frequency Spectrum Analysis", fs=24.0)
-        csi_fft = plot_fft_spectrum(csi_series, "CSI Frequency Spectrum Analysis", fs=24.0)
+        # 生成增强的FFT频谱图 (only for loaded modalities)
+        uwb_fft = plot_fft_spectrum(uwb_series, "UWB Frequency Spectrum Analysis", fs=24.0) if uwb_series is not None else ""
+        imu_fft = plot_fft_spectrum(imu_series, "IMU Frequency Spectrum Analysis", fs=24.0) if imu_series is not None else ""
+        csi_fft = plot_fft_spectrum(csi_series, "CSI Frequency Spectrum Analysis", fs=24.0) if csi_series is not None else ""
 
         # CSI暂时不生成spectrogram（可选）
         csi_spectrogram = ""
 
-        # 生成Depth和RGB预览
-        depth_png = png_b64_from_file(DEPTH_PNG_PATH)
-        rgb_png = png_b64_from_file(RGB_PNG_PATH)
+        # 生成Depth和RGB预览 (only if enabled)
+        depth_png = png_b64_from_file(DEPTH_PNG_PATH) if "Depth" in enabled_modalities else ""
+        rgb_png = png_b64_from_file(RGB_PNG_PATH) if "RGB" in enabled_modalities else ""
 
         step1_time = time.time() - step1_start
 
+        # Build step1_data with only enabled modalities
+        step1_modalities = {}
+
+        if "Depth" in enabled_modalities:
+            step1_modalities["Depth"] = {
+                "kind": "image",
+                "shape": "64×64",
+                "preview_png": depth_png or "",
+                "plaintext_excerpt": "Depth map for sleep posture detection"
+            }
+
+        if "UWB" in enabled_modalities and uwb_series is not None:
+            step1_modalities["UWB"] = {
+                "kind": "timeseries",
+                "shape": f"{uwb_series.shape[0]}×{uwb_series.shape[1]}",
+                "preview_png": uwb_preview,
+                "plaintext_excerpt": excerpt_array(uwb_series, rows=4, cols=3),
+                "fft_png": uwb_fft,
+            }
+
+        if "IMU" in enabled_modalities and imu_series is not None:
+            step1_modalities["IMU"] = {
+                "kind": "timeseries",
+                "shape": f"{imu_series.shape[0]}×{imu_series.shape[1]}",
+                "preview_png": imu_preview,
+                "plaintext_excerpt": excerpt_array(imu_series, rows=4, cols=6),
+                "fft_png": imu_fft,
+            }
+
+        if "CSI" in enabled_modalities and csi_series is not None:
+            step1_modalities["CSI"] = {
+                "kind": "timeseries",
+                "shape": f"{csi_series.shape[0]}×{csi_series.shape[1]}",
+                "preview_png": csi_preview,
+                "plaintext_excerpt": excerpt_array(csi_series, rows=4, cols=4),
+                "fft_png": csi_fft,
+                "spectrogram_png": csi_spectrogram,
+            }
+
+        if "RGB" in enabled_modalities:
+            step1_modalities["RGB"] = {
+                "kind": "image",
+                "shape": "64×64×3",
+                "preview_png": rgb_png or "",
+                "plaintext_excerpt": "RGB image for risk assessment"
+            }
+
         step1_data = {
             "time_sec": step1_time,
-            "modalities": {
-                "Depth": {
-                    "kind": "image",
-                    "shape": "64×64",
-                    "preview_png": depth_png or "",
-                    "plaintext_excerpt": "Depth map for sleep posture detection"
-                },
-                "UWB": {
-                    "kind": "timeseries",
-                    "shape": f"{uwb_series.shape[0]}×{uwb_series.shape[1]}",
-                    "preview_png": uwb_preview,
-                    "plaintext_excerpt": excerpt_array(uwb_series, rows=4, cols=3),
-                    "fft_png": uwb_fft,
-                },
-                "IMU": {
-                    "kind": "timeseries",
-                    "shape": f"{imu_series.shape[0]}×{imu_series.shape[1]}",
-                    "preview_png": imu_preview,
-                    "plaintext_excerpt": excerpt_array(imu_series, rows=4, cols=6),
-                    "fft_png": imu_fft,
-                },
-                "CSI": {
-                    "kind": "timeseries",
-                    "shape": f"{csi_series.shape[0]}×{csi_series.shape[1]}",
-                    "preview_png": csi_preview,
-                    "plaintext_excerpt": excerpt_array(csi_series, rows=4, cols=4),
-                    "fft_png": csi_fft,
-                    "spectrogram_png": csi_spectrogram,
-                },
-                "RGB": {
-                    "kind": "image",
-                    "shape": "64×64×3",
-                    "preview_png": rgb_png or "",
-                    "plaintext_excerpt": "RGB image for risk assessment"
-                }
-            }
+            "modalities": step1_modalities,
+            "enabled_modalities": enabled_modalities
         }
     except Exception as e:
         return {"error": f"Step 1 failed: {str(e)}"}
@@ -820,10 +915,10 @@ async def run_cycle():
     # Step 2: 加密和推理
     step2_start = time.time()
     try:
-        # 特征提取
-        uwb_feat = feat_from_series(uwb_series)
-        imu_feat = feat_from_series(imu_series)
-        csi_feat = feat_from_series(csi_series)
+        # 特征提取 (only for loaded modalities)
+        uwb_feat = feat_from_series(uwb_series) if uwb_series is not None else np.zeros(8)
+        imu_feat = feat_from_series(imu_series) if imu_series is not None else np.zeros(8)
+        csi_feat = feat_from_series(csi_series) if csi_series is not None else np.zeros(8)
 
         ctx = setup_context()
 
@@ -835,14 +930,24 @@ async def run_cycle():
         # 聚合密文
         agg_bytes = enc_uwb.serialize() + enc_imu.serialize()[:100]
 
-        # LLM智能分配
-        assignments = [
-            {"input_modality": "CSI", "model_id": "ecg", "tool": "secure_ecg_toolbox"},
-            {"input_modality": "UWB", "model_id": "bp", "tool": "secure_bp_toolbox"},
-            {"input_modality": "IMU", "model_id": "sleep", "tool": "secure_sleep_toolbox"},
-            {"input_modality": "IMU", "model_id": "metabolic", "tool": "secure_metabolic_toolbox"},
-            {"input_modality": "RGB", "model_id": "risk", "tool": "secure_risk_toolbox"}
-        ]
+        # LLM智能分配 (only for enabled modalities)
+        assignments = []
+        if "CSI" in enabled_modalities:
+            assignments.append({"input_modality": "CSI", "model_id": "ecg", "tool": "secure_ecg_toolbox"})
+        if "UWB" in enabled_modalities:
+            assignments.append({"input_modality": "UWB", "model_id": "bp", "tool": "secure_bp_toolbox"})
+        if "IMU" in enabled_modalities:
+            assignments.append({"input_modality": "IMU", "model_id": "sleep", "tool": "secure_sleep_toolbox"})
+            assignments.append({"input_modality": "IMU", "model_id": "metabolic", "tool": "secure_metabolic_toolbox"})
+        if "RGB" in enabled_modalities:
+            assignments.append({"input_modality": "RGB", "model_id": "risk", "tool": "secure_risk_toolbox"})
+
+        # Fallback: if no modalities selected, use default assignment
+        if not assignments:
+            assignments = [
+                {"input_modality": "CSI", "model_id": "ecg", "tool": "secure_ecg_toolbox"},
+                {"input_modality": "UWB", "model_id": "bp", "tool": "secure_bp_toolbox"},
+            ]
 
         # 模拟推理结果 - 使用正确的数据结构
         results = []
@@ -902,8 +1007,12 @@ async def run_cycle():
     # Step 3: 解密和报告生成
     step3_start = time.time()
     try:
-        # 生成完整健康报告
-        report = build_health_report(results, uwb_series, imu_series, csi_series)
+        # 生成完整健康报告 (use zero arrays for missing modalities)
+        uwb_for_report = uwb_series if uwb_series is not None else np.zeros((100, 3))
+        imu_for_report = imu_series if imu_series is not None else np.zeros((250, 6))
+        csi_for_report = csi_series if csi_series is not None else np.zeros((200, 8))
+
+        report = build_health_report(results, uwb_for_report, imu_for_report, csi_for_report)
 
         # 调用智谱AI增强结论
         activity_mix = report['charts']['activity_mix']
