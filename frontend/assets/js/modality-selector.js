@@ -88,13 +88,14 @@ class ModalitySelector {
 
         if (response.ok) {
           const data = await response.json();
-          if (data.thumbnail) {
-            this.modalityThumbnails[modality.name] = data.thumbnail;
-            console.log(`✅ ${modality.name} 缩略图加载成功`);
-          } else {
-            console.warn(`⚠️ ${modality.name} 没有返回缩略图数据`);
-            this.modalityThumbnails[modality.name] = null;
-          }
+          // 存储完整响应数据（包含 data/thumbnail/shape/channels 等字段）
+          this.modalityThumbnails[modality.name] = data;
+          console.log(`✅ ${modality.name} 数据加载成功:`, {
+            type: data.type,
+            hasData: !!data.data,
+            hasThumbnail: !!data.thumbnail,
+            shape: data.shape
+          });
         } else {
           console.warn(`⚠️ ${modality.name} API响应错误: ${response.status}`);
           this.modalityThumbnails[modality.name] = null;
@@ -106,16 +107,14 @@ class ModalitySelector {
       }
     });
 
-    // 并行加载所有缩略图，但不阻塞初始化
-    Promise.all(thumbnailPromises).then(() => {
-      console.log('所有缩略图加载完成');
-      // 缩略图加载完成后重新渲染卡片
-      this.renderCards();
-    }).catch(err => {
-      console.warn('部分缩略图加载失败:', err);
-      // 即使失败也重新渲染，使用默认图标
-      this.renderCards();
-    });
+    // 等待所有缩略图加载完成
+    try {
+      await Promise.all(thumbnailPromises);
+      console.log('✅ 所有缩略图加载完成');
+    } catch (err) {
+      console.warn('⚠️ 部分缩略图加载失败:', err);
+      // 即使部分失败也继续执行
+    }
   }
 
   async fetchWithTimeout(url, options = {}, timeout = this.apiTimeout) {
@@ -217,34 +216,80 @@ class ModalitySelector {
     container.innerHTML = '';
 
     this.modalities.forEach(modality => {
-      const card = document.createElement('div');
-      card.className = 'modality-card';
-      card.dataset.modalityId = modality.id;
-      card.dataset.modalityName = modality.name;
+      // 使用 ModalityCards 组件生成卡片
+      if (typeof ModalityCards !== 'undefined') {
+        const config = ModalityCards.MODALITY_CONFIG[modality.id];
+        if (config) {
+          // 传递完整的API响应数据
+          const modalityData = this.modalityThumbnails[modality.name] || {};
 
-      // 检查缩略图状态
-      const thumbnailData = this.modalityThumbnails[modality.name];
-      const hasThumbnail = thumbnailData !== undefined;
+          // 调试：检查数据
+          console.log(`🎨 渲染卡片 ${modality.id}:`, {
+            name: modality.name,
+            type: modalityData.type,
+            hasData: !!modalityData.data,
+            hasThumbnail: !!modalityData.thumbnail,
+            shape: modalityData.shape
+          });
 
-      let iconDisplay;
-      if (hasThumbnail && thumbnailData) {
-        // 有缩略图
-        iconDisplay = `<img src="data:image/png;base64,${thumbnailData}" class="card-thumbnail" alt="${modality.name}">`;
-      } else if (hasThumbnail && !thumbnailData) {
-        // 加载失败，显示默认图标
-        iconDisplay = `<div class="card-icon">${modality.icon || '📊'}</div>`;
+          // 生成卡片HTML
+          const cardHTML = ModalityCards.createModalityCard(modality.id, modalityData);
+          container.insertAdjacentHTML('beforeend', cardHTML);
+
+          // 设置 dataset
+          const card = container.lastElementChild;
+          card.dataset.modalityId = modality.id;
+          card.dataset.modalityName = modality.name;
+
+          // 如果有时序或骨架数据，立即绘制Canvas
+          if (modalityData.data && (config.type === 'timeseries' || config.type === 'skeleton')) {
+            const canvasId = `modality-${modality.id}-canvas`; // 使用完整的cardId前缀
+            console.log(`🎨 即将绘制 ${modality.id} Canvas, canvasId: ${canvasId}, 数据形状: ${modalityData.shape}`);
+
+            // 等待DOM更新后绘制
+            setTimeout(() => {
+              const canvasElement = document.getElementById(canvasId);
+              if (canvasElement) {
+                console.log(`✅ Canvas元素找到: ${canvasId}, 类型: ${config.type}, 尺寸: ${canvasElement.offsetWidth}x${canvasElement.offsetHeight}`);
+                if (config.type === 'timeseries') {
+                  // data格式: [channels][samples]，直接传递给drawTimeSeriesCard
+                  const clickHandler = ModalityCards.drawTimeSeriesCard(canvasId, modalityData.data, config);
+                  if (clickHandler) {
+                    canvasElement.addEventListener('click', clickHandler);
+                  }
+                } else if (config.type === 'skeleton') {
+                  ModalityCards.drawSkeletonCard(canvasId, modalityData.data);
+                }
+              } else {
+                console.warn(`❌ Canvas元素未找到: ${canvasId}`);
+              }
+            }, 100);
+          }
+        }
       } else {
-        // 还在加载中，显示加载动画
-        iconDisplay = `<div class="card-loading" title="加载中..."></div>`;
+        // Fallback：使用原来的渲染方式
+        const card = document.createElement('div');
+        card.className = 'modality-card';
+        card.dataset.modalityId = modality.id;
+        card.dataset.modalityName = modality.name;
+
+        const thumbnailData = this.modalityThumbnails[modality.name];
+        let iconDisplay;
+
+        if (thumbnailData) {
+          iconDisplay = `<img src="data:image/png;base64,${thumbnailData}" class="card-thumbnail" alt="${modality.name}">`;
+        } else {
+          iconDisplay = `<div class="card-loading"></div>`;
+        }
+
+        card.innerHTML = `
+          <div class="card-title">${modality.name}</div>
+          ${iconDisplay}
+          <div class="card-desc">${modality.description}</div>
+        `;
+
+        container.appendChild(card);
       }
-
-      card.innerHTML = `
-        <div class="card-title">${modality.name}</div>
-        ${iconDisplay}
-        <div class="card-desc">${modality.description}</div>
-      `;
-
-      container.appendChild(card);
     });
 
     console.log(`渲染了 ${this.modalities.length} 个模态卡片`);
@@ -406,9 +451,6 @@ class ModalitySelector {
       const data = await this.launchAnalysisWithRetry(selectedList);
 
       this.updateProgress(100, '分析完成');
-
-      // 显示加密动画
-      this.showEncryptionAnimation();
 
       // 处理结果
       this.handleResults(data);
@@ -673,6 +715,11 @@ class ModalitySelector {
       renderModalities(data.step1?.modalities || {});
       console.log('✅ Rendered modalities');
 
+      // 重新绘制时序和骨架类卡片（使用ModalityCards组件）
+      if (typeof ModalityCards !== 'undefined' && data.step1?.modalities) {
+        this.redrawCardsWithCanvas(data.step1.modalities);
+      }
+
       // 更新Step 1状态为完成
       const tUpload = document.getElementById('tUpload');
       if (tUpload && data.step1 && data.step1.time_sec !== undefined) {
@@ -738,6 +785,70 @@ class ModalitySelector {
 
     // 显示缩略图
     this.showThumbnails(data);
+  }
+
+  redrawCardsWithCanvas(modalitiesData) {
+    // 根据后端返回的数据，用Canvas可视化替换缩略图
+    Object.keys(modalitiesData).forEach(modalityName => {
+      const modData = modalitiesData[modalityName];
+
+      // 找到对应的卡片
+      let modalityKey = null;
+      if (modalityName === 'UWB') modalityKey = 'uwb';
+      else if (modalityName === 'IMU') modalityKey = 'imu';
+      else if (modalityName === 'CSI') modalityKey = 'csi';
+      else if (modalityName === 'NTU') modalityKey = 'ntu';
+      else if (modalityName === 'Depth') modalityKey = 'depth';
+      else if (modalityName === 'RGB') modalityKey = 'rgb';
+      else if (modalityName === 'Retina') modalityKey = 'retina';
+      else if (modalityName === 'Chest') modalityKey = 'chest';
+      else if (modalityName === 'Path') modalityKey = 'path';
+      else if (modalityName === 'Blood') modalityKey = 'blood';
+
+      if (!modalityKey) return;
+
+      const config = ModalityCards.MODALITY_CONFIG[modalityKey];
+      if (!config) return;
+
+      const card = document.querySelector(`[data-modality-id="${modalityKey}"]`);
+      if (!card) return;
+
+      const visualContainer = card.querySelector('.card-visual');
+      if (!visualContainer) return;
+
+      // 移除preview-placeholder类（如果有）
+      const placeholder = visualContainer.querySelector('.preview-placeholder');
+      if (placeholder) {
+        placeholder.classList.add('replacing'); // 添加过渡动画类
+      }
+
+      if (config.type === 'timeseries' && modData.raw_data) {
+        // 时序类：绘制波形图
+        visualContainer.innerHTML = `<canvas id="canvas-${modalityKey}" class="card-canvas"></canvas>`;
+        const canvasId = `canvas-${modalityKey}`;
+
+        setTimeout(() => {
+          const clickHandler = ModalityCards.drawTimeSeriesCard(canvasId, modData.raw_data, config);
+          if (clickHandler) {
+            const canvas = document.getElementById(canvasId);
+            if (canvas) {
+              canvas.addEventListener('click', clickHandler);
+            }
+          }
+        }, 100);
+
+      } else if (config.type === 'skeleton' && modData.keypoints) {
+        // 骨架类：绘制火柴人
+        visualContainer.innerHTML = `<canvas id="canvas-${modalityKey}" class="card-canvas skeleton-canvas"></canvas>`;
+        const canvasId = `canvas-${modalityKey}`;
+
+        setTimeout(() => {
+          ModalityCards.drawSkeletonCard(canvasId, modData.keypoints);
+        }, 100);
+      }
+    });
+
+    console.log('✅ Redrawn cards with Canvas visualizations');
   }
 
   showThumbnails(data) {

@@ -26,9 +26,14 @@ from fastapi.middleware.cors import CORSMiddleware
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 DATA_PATHS = {
-    "UWB": os.path.join(BASE_DIR, "test_data", "uwb_from_utar.txt"),
-    "IMU": os.path.join(BASE_DIR, "test_data", "imu_from_utar.txt"),
-    "CSI": os.path.join(BASE_DIR, "test_data", "csi_from_utar.csv"),
+    "UWB": os.path.join(BASE_DIR, "test_data", "uwb_sample.txt"),
+    "IMU": os.path.join(BASE_DIR, "test_data", "imu_sample.txt"),
+    "CSI": os.path.join(BASE_DIR, "test_data", "csi_sample.csv"),
+    "NTU": os.path.join(BASE_DIR, "test_data", "ntu_sample.txt"),
+    "Retina": os.path.join(BASE_DIR, "test_data", "retina_sample.npz"),
+    "Chest": os.path.join(BASE_DIR, "test_data", "chest_sample.npz"),
+    "Path": os.path.join(BASE_DIR, "test_data", "path_sample.npz"),
+    "Blood": os.path.join(BASE_DIR, "test_data", "blood_sample.npz"),
 }
 
 ASSET_USER_DIR = os.path.join(BASE_DIR, "frontend", "assets", "user")
@@ -36,7 +41,7 @@ DEPTH_PNG_PATH = os.path.join(ASSET_USER_DIR, "deep2.png")
 RGB_PNG_PATH = os.path.join(ASSET_USER_DIR, "RGB.png")
 
 _DATA_CACHE: Dict[str, np.ndarray] = {}
-_THUMBNAIL_CACHE: Dict[str, str] = {}  # Cache for generated thumbnails
+_THUMBNAIL_CACHE: Dict[str, str] = {}  # Cache for generated thumbnails - 清空缓存以重新生成缩略图
 MODALITY_CONFIG = {
     "Depth": {"enabled": True, "file": DEPTH_PNG_PATH},
     "UWB": {"enabled": True, "file": DATA_PATHS["UWB"]},
@@ -59,7 +64,26 @@ MODALITY_NAME_MAP = {
     "RetinaMNIST": "Retina",
     "ChestMNIST": "Chest",
     "PathMNIST": "Path",
-    "BloodMNIST": "Blood"
+    "BloodMNIST": "Blood",
+    # 前端使用的名称（中文 + 英文）
+    "Depth": "Depth",
+    "UWB": "UWB",
+    "IMU": "IMU",
+    "CSI": "CSI",
+    "RGB": "RGB",
+    "Retina": "Retina",
+    "Chest": "Chest",
+    "Pathology": "Path",
+    "Blood": "Blood",
+    "深度图像": "Depth",
+    "UWB雷达": "UWB",
+    "IMU传感器": "IMU",
+    "WiFi CSI": "CSI",
+    "RGB摄像头": "RGB",
+    "视网膜": "Retina",
+    "胸部X光": "Chest",
+    "组织病理": "Path",
+    "血细胞": "Blood"
 }
 
 def normalize_modality_name(name: str) -> str:
@@ -98,10 +122,17 @@ def b64e(b: bytes) -> str:
     return base64.b64encode(b).decode("ascii")
 
 def png_b64_from_plt(fig, pad_inches: float = 0.06) -> str:
-    bio = BytesIO()
-    fig.savefig(bio, format="png", dpi=160, bbox_inches="tight", pad_inches=pad_inches)
-    plt.close(fig)
-    return b64e(bio.getvalue())
+    try:
+        bio = BytesIO()
+        fig.savefig(bio, format="png", dpi=160, bbox_inches="tight", pad_inches=pad_inches)
+        plt.close(fig)
+        result = b64e(bio.getvalue())
+        print(f"✅ png_b64_from_plt: Generated {len(result)} bytes")
+        return result
+    except Exception as e:
+        print(f"❌ png_b64_from_plt failed: {e}")
+        plt.close(fig)
+        return ""
 
 def generate_thumbnail(data: np.ndarray, modality_type: str, size=(200, 150)) -> str:
     """生成高质量预览缩略图（带缓存）"""
@@ -110,7 +141,10 @@ def generate_thumbnail(data: np.ndarray, modality_type: str, size=(200, 150)) ->
 
     # 检查缓存
     if cache_key in _THUMBNAIL_CACHE:
+        print(f"✅ Using cached thumbnail for {modality_type}")
         return _THUMBNAIL_CACHE[cache_key]
+
+    print(f"🎨 Generating NEW thumbnail for {modality_type}, data shape: {data.shape}")
 
     try:
         # 创建更大的图形以获得更好的质量
@@ -139,10 +173,9 @@ def generate_thumbnail(data: np.ndarray, modality_type: str, size=(200, 150)) ->
             ax.spines['right'].set_visible(False)
 
         elif modality_type == 'skeleton':
-            # 骨骼数据：3D散点图
-            from mpl_toolkits.mplot3d import Axes3D
-            fig = plt.figure(figsize=(size[0]/100, size[1]/100), dpi=150)
-            ax = fig.add_subplot(111, projection='3d')
+            # 骨骼数据：绘制简化的2D火柴人
+            plt.close(fig)  # 关闭之前创建的fig
+            fig, ax = plt.subplots(figsize=(size[0]/100, size[1]/100), dpi=150)
 
             # 重塑数据为 (N, 3)
             if data.ndim == 1:
@@ -151,17 +184,35 @@ def generate_thumbnail(data: np.ndarray, modality_type: str, size=(200, 150)) ->
             elif data.ndim == 2 and data.shape[1] >= 3:
                 points = data[:, :3]
             else:
-                points = data.flatten()[:30].reshape(10, 3)
+                points = data.flatten()[:75].reshape(25, 3)  # NTU标准：25个关节点
 
-            # 绘制3D散点
-            ax.scatter(points[:, 0], points[:, 1], points[:, 2],
-                      c=range(len(points)), cmap='viridis', s=20, alpha=0.6)
+            # 归一化到画布坐标
+            x = points[:, 0]
+            y = -points[:, 1]  # 翻转y轴
+
+            # 绘制关节点（只画主要的15个点）
+            main_joints = [0, 1, 20, 2, 5, 3, 6, 4, 7, 8, 11, 9, 12, 10, 13]
+            for idx in main_joints:
+                if idx < len(points):
+                    ax.scatter(x[idx], y[idx], s=30, c='#ef4444', zorder=3, edgecolors='white', linewidths=0.5)
+
+            # 绘制骨骼连接线
+            bones = [
+                (0, 1), (1, 20), (21, 20), (21, 2), (21, 5),
+                (2, 3), (3, 4), (5, 6), (6, 7),
+                (0, 8), (0, 11), (8, 9), (9, 10), (11, 12), (12, 13)
+            ]
+
+            for i, j in bones:
+                if i < len(points) and j < len(points):
+                    ax.plot([x[i], x[j]], [y[i], y[j]], 'o-', c='#ef4444', linewidth=1.5, markersize=3, alpha=0.7)
 
             ax.set_facecolor('#f8fafc')
-            ax.grid(False)
+            ax.set_xlim(-1, 1)
+            ax.set_ylim(-1, 1)
             ax.set_xticks([])
             ax.set_yticks([])
-            ax.set_zticks([])
+            ax.set_aspect('equal')
 
         elif modality_type in ['image', 'medical_image']:
             # 图像数据：高质量显示
@@ -209,10 +260,12 @@ def generate_thumbnail(data: np.ndarray, modality_type: str, size=(200, 150)) ->
         return result
 
     except Exception as e:
-        print(f"缩略图生成失败 ({modality_type}): {e}")
+        print(f"❌ 缩略图生成失败 ({modality_type}): {e}")
+        print(f"   Data shape: {data.shape}, dtype: {data.dtype}")
+        print(f"   Data range: min={data.min():.4f}, max={data.max():.4f}")
         import traceback
         traceback.print_exc()
-        return ""
+        return None
 
 def png_b64_from_file(path: str) -> Optional[str]:
     """Load and convert image file to base64 with caching."""
@@ -1085,15 +1138,25 @@ async def health_check():
 
 @app.get("/api/modalities")
 async def get_modalities():
-    """获取所有可用的模态配置"""
+    """获取所有可用的模态配置，包括文件信息"""
     try:
         config_path = os.path.join(BASE_DIR, "backend", "modality_config.json")
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
+
+        # 添加文件信息到每个模态
+        test_data_dir = os.path.join(BASE_DIR, "test_data")
+
+        for modality in config.get("modalities", []):
+            modality_id = modality["id"]
+            file_info = get_modality_file_info(modality_id, test_data_dir)
+            modality["files"] = file_info
+
         return config
+
     except Exception as e:
         # 如果配置文件不存在，返回默认配置
-        return {
+        default_config = {
             "modalities": [
                 {"id": "depth", "name": "深度图像", "type": "image", "description": "睡眠姿态检测", "icon": "🛏️"},
                 {"id": "uwb", "name": "UWB雷达", "type": "timeseries", "description": "心率、血压监测", "icon": "📡"},
@@ -1108,9 +1171,57 @@ async def get_modalities():
             ]
         }
 
+        # 添加文件信息
+        test_data_dir = os.path.join(BASE_DIR, "test_data")
+        for modality in default_config["modalities"]:
+            modality_id = modality["id"]
+            file_info = get_modality_file_info(modality_id, test_data_dir)
+            modality["files"] = file_info
+
+        return default_config
+
+def get_modality_file_info(modality_id: str, test_data_dir: str) -> list:
+    """获取指定模态的可用文件列表"""
+    file_mapping = {
+        "uwb": ["uwb_sample.txt"],
+        "imu": ["imu_sample.txt"],
+        "csi": ["csi_sample.csv"],
+        "ntu": ["ntu_sample.txt"],
+        "retina": ["retina_sample.npz"],
+        "chest": ["chest_sample.npz"],
+        "path": ["path_sample.npz"],
+        "blood": ["blood_sample.npz"],
+        "depth": ["depth_sample.png"],
+        "rgb": ["rgb_sample.png"]
+    }
+
+    files = file_mapping.get(modality_id, [])
+    file_info_list = []
+
+    for filename in files:
+        filepath = os.path.join(test_data_dir, filename)
+        if os.path.exists(filepath):
+            size = os.path.getsize(filepath)
+            file_info_list.append({
+                "name": filename,
+                "path": filepath,
+                "size": size,
+                "size_human": format_size(size)
+            })
+
+    return file_info_list
+
+def format_size(size_bytes: int) -> str:
+    """格式化文件大小为人类可读格式"""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.1f} TB"
+
 @app.get("/api/modality_thumbnail")
 async def get_modality_thumbnail(modality: str):
-    """获取指定模态的缩略图预览"""
+    """获取指定模态的缩略图预览 - 返回原始数据供前端Canvas绘制"""
     try:
         # 标准化模态名称
         normalized_name = normalize_modality_name(modality)
@@ -1127,35 +1238,97 @@ async def get_modality_thumbnail(modality: str):
             return {"thumbnail": None, "error": "Modality not found"}
 
         # 确定数据类型
-        modality_config = load_modality_config()
-
-        # 查找模态信息（尝试完整名称和简化名称）
-        mod_info = modality_config.get(modality, {}) or modality_config.get(normalized_name, {})
-
-        # 从配置中获取data_type，或者根据模态名称推断
-        if isinstance(mod_info, dict):
-            data_type = mod_info.get("data_type", "timeseries")
+        if normalized_name in ["Depth", "RGB"]:
+            data_type = "image"
+        elif normalized_name in ["Retina", "Chest", "Path", "Blood"]:
+            data_type = "medical_image"
+        elif normalized_name == "NTU":
+            data_type = "skeleton"
         else:
-            # 根据模态名称推断类型
-            if normalized_name in ["Depth", "RGB", "Retina", "Chest", "Path", "Blood"]:
-                data_type = "image"
-            elif normalized_name == "NTU":
-                data_type = "video"
-            else:
-                data_type = "timeseries"
+            data_type = "timeseries"
 
-        # 生成缩略图 - 根据data_type选择合适的可视化方式
-        if data_type == "video":
-            # NTU数据使用skeleton可视化
-            modality_type = "skeleton"
+        print(f"📊 Modality: {modality} -> {normalized_name}, data_type: {data_type}")
+
+        # 🎨 返回原始数据，前端用Canvas绘制
+        result = {
+            "modality": modality,
+            "type": data_type,
+            "data": None,
+            "shape": None,
+            "channels": None
+        }
+
+        if data_type == "timeseries":
+            # 时序数据：返回原始数据数组
+            result["data"] = data.T.tolist() if data.ndim > 1 else data.tolist()
+            result["shape"] = list(data.shape)
+            result["channels"] = data.shape[1] if data.ndim > 1 else 1
+            print(f"   Timeseries data: {data.shape} -> {len(result['data'])} channels x {len(result['data'][0])} samples")
+
+        elif data_type == "skeleton":
+            # 骨架数据：返回关键点
+            result["data"] = data.tolist() if isinstance(data, np.ndarray) else data
+            result["shape"] = list(data.shape) if isinstance(data, np.ndarray) else [25, 3]
+            print(f"   Skeleton data: {result['shape']}")
+
         elif data_type in ["image", "medical_image"]:
-            modality_type = "image"
-        else:
-            modality_type = "timeseries"
+            # 图像数据：读取PNG文件
+            if normalized_name == "Depth":
+                img_path = DEPTH_PNG_PATH
+            elif normalized_name == "RGB":
+                img_path = RGB_PNG_PATH
+            else:
+                # 医学图像从npz文件加载
+                img_path = os.path.join(BASE_DIR, "test_data", f"{normalized_name.lower()}_sample.npz")
 
-        thumbnail = generate_thumbnail(data, modality_type)
+            # 读取PNG或NPZ文件并转换为base64
+            if img_path.endswith('.png'):
+                with open(img_path, 'rb') as f:
+                    img_data = f.read()
+                    result["thumbnail"] = b64e(img_data)
+                    print(f"   Image thumbnail: {len(img_data)} bytes")
+            else:
+                # NPZ文件 - 加载第一张图像
+                npz_data = np.load(img_path)
+                if 'train_images' in npz_data:
+                    img = npz_data['train_images'][0]
+                elif 'images' in npz_data:
+                    img = npz_data['images'][0]
+                else:
+                    # 直接使用image字段（可能只有一张图像）
+                    img = npz_data[list(npz_data.keys())[0]]
+                    # 如果img是3D的(N,H,W)且N=1，取第一张
+                    if img.ndim == 3 and img.shape[0] == 1:
+                        img = img[0]
+                    # 如果img是4D的(N,H,W,C)，取第一张
+                    elif img.ndim == 4:
+                        img = img[0]
 
-        return {"thumbnail": thumbnail, "modality": modality, "type": modality_type}
+                # 转换为PNG
+                import io
+                from PIL import Image
+                # 归一化到0-255范围
+                img_array = (img * 255).astype(np.uint8) if img.max() <= 1 else img.astype(np.uint8)
+                # 处理不同格式的图像数据
+                if img_array.ndim == 3 and img_array.shape[-1] == 1:
+                    img_array = img_array.squeeze(-1)  # 移除单通道维度
+                elif img_array.ndim == 2:
+                    pass  # 已经是灰度图
+                elif img_array.ndim == 3:
+                    pass  # RGB图像
+
+                # 确定图像模式
+                if img_array.ndim == 2:
+                    img_pil = Image.fromarray(img_array, mode='L')
+                else:
+                    img_pil = Image.fromarray(img_array)
+
+                img_bytes = io.BytesIO()
+                img_pil.save(img_bytes, format='PNG')
+                result["thumbnail"] = b64e(img_bytes.getvalue())
+                print(f"   Medical image thumbnail generated: {img_array.shape} -> {len(img_bytes.getvalue())} bytes")
+
+        return result
 
     except Exception as e:
         print(f"生成缩略图失败 ({modality}): {e}")
@@ -1216,10 +1389,10 @@ async def run_cycle(selected_modalities: Optional[str] = None):
     # Step 1: 数据收集
     step1_start = time.time()
     try:
-        # Only load selected modalities
-        uwb_data = get_data("UWB") if "UWB" in enabled_modalities else None
-        imu_data = get_data("IMU") if "IMU" in enabled_modalities else None
-        csi_data = get_data("CSI") if "CSI" in enabled_modalities else None
+        # Only load selected modalities (support both short names and full names)
+        uwb_data = get_data("UWB") if ("UWB" in enabled_modalities or "UWB Radar" in enabled_modalities) else None
+        imu_data = get_data("IMU") if ("IMU" in enabled_modalities or "IMU Sensor" in enabled_modalities) else None
+        csi_data = get_data("CSI") if ("CSI" in enabled_modalities or "WiFi CSI" in enabled_modalities) else None
 
         # 重塑数据 (only for loaded modalities)
         uwb_series = uwb_data.reshape(-1, 3) if uwb_data is not None else None
@@ -1251,42 +1424,59 @@ async def run_cycle(selected_modalities: Optional[str] = None):
         if "Depth" in enabled_modalities:
             step1_modalities["Depth"] = {
                 "kind": "image",
+                "type": "image",
                 "shape": "64×64",
                 "preview_png": depth_png or "",
                 "plaintext_excerpt": "Depth map for sleep posture detection"
             }
 
-        if "UWB" in enabled_modalities and uwb_series is not None:
+        if ("UWB" in enabled_modalities or "UWB Radar" in enabled_modalities) and uwb_series is not None:
+            # 转置数据：从 (samples, channels) 到 (channels, samples)
+            uwb_raw = uwb_series.T.tolist()  # 现在是 [3][samples]
             step1_modalities["UWB"] = {
                 "kind": "timeseries",
+                "type": "timeseries",
                 "shape": f"{uwb_series.shape[0]}×{uwb_series.shape[1]}",
+                "channels": uwb_series.shape[1],
                 "preview_png": uwb_preview,
                 "plaintext_excerpt": excerpt_array(uwb_series, rows=4, cols=3),
                 "fft_png": uwb_fft,
+                "raw_data": uwb_raw  # 新增：原始数据，格式为 [channels][samples]
             }
 
         if "IMU" in enabled_modalities and imu_series is not None:
+            # 转置数据：从 (samples, channels) 到 (channels, samples)
+            imu_raw = imu_series.T.tolist()  # 现在是 [6][samples]
             step1_modalities["IMU"] = {
                 "kind": "timeseries",
+                "type": "timeseries",
                 "shape": f"{imu_series.shape[0]}×{imu_series.shape[1]}",
+                "channels": imu_series.shape[1],
                 "preview_png": imu_preview,
                 "plaintext_excerpt": excerpt_array(imu_series, rows=4, cols=6),
                 "fft_png": imu_fft,
+                "raw_data": imu_raw  # 新增：原始数据，格式为 [channels][samples]
             }
 
-        if "CSI" in enabled_modalities and csi_series is not None:
+        if ("CSI" in enabled_modalities or "WiFi CSI" in enabled_modalities) and csi_series is not None:
+            # 转置数据：从 (samples, channels) 到 (channels, samples)
+            csi_raw = csi_series.T.tolist()  # 现在是 [8][samples]
             step1_modalities["CSI"] = {
                 "kind": "timeseries",
+                "type": "timeseries",
                 "shape": f"{csi_series.shape[0]}×{csi_series.shape[1]}",
+                "channels": csi_series.shape[1],
                 "preview_png": csi_preview,
                 "plaintext_excerpt": excerpt_array(csi_series, rows=4, cols=4),
                 "fft_png": csi_fft,
                 "spectrogram_png": csi_spectrogram,
+                "raw_data": csi_raw  # 新增：原始数据，格式为 [channels][samples]
             }
 
         if "RGB" in enabled_modalities:
             step1_modalities["RGB"] = {
                 "kind": "image",
+                "type": "image",
                 "shape": "64×64×3",
                 "preview_png": rgb_png or "",
                 "plaintext_excerpt": "RGB image for risk assessment"
@@ -1294,16 +1484,21 @@ async def run_cycle(selected_modalities: Optional[str] = None):
 
         # 新增的5种医学图像模态
         if "NTU" in enabled_modalities:
+            # 生成骨架关键点数据
+            ntu_skeleton = _generate_medical_image_sample("NTU").reshape(25, 3)  # 25个关节点，每个3维
             step1_modalities["NTU"] = {
-                "kind": "image",
-                "shape": "skeleton",
+                "kind": "skeleton",
+                "type": "skeleton",
+                "shape": "25×3",
                 "preview_png": generate_thumbnail(_generate_medical_image_sample("NTU"), "skeleton"),
-                "plaintext_excerpt": "Skeleton data for action recognition"
+                "plaintext_excerpt": "Skeleton data for action recognition",
+                "keypoints": ntu_skeleton.tolist()  # 新增：25个关节点的3D坐标
             }
 
         if "Retina" in enabled_modalities:
             step1_modalities["Retina"] = {
                 "kind": "image",
+                "type": "image",
                 "shape": "224×224×3",
                 "preview_png": generate_thumbnail(_generate_medical_image_sample("Retina"), "medical_image"),
                 "plaintext_excerpt": "Retinal fundus image for cardiovascular screening"
@@ -1312,6 +1507,7 @@ async def run_cycle(selected_modalities: Optional[str] = None):
         if "Chest" in enabled_modalities:
             step1_modalities["Chest"] = {
                 "kind": "image",
+                "type": "image",
                 "shape": "224×224×3",
                 "preview_png": generate_thumbnail(_generate_medical_image_sample("Chest"), "medical_image"),
                 "plaintext_excerpt": "Chest X-ray for lung disease screening"
@@ -1320,6 +1516,7 @@ async def run_cycle(selected_modalities: Optional[str] = None):
         if "Path" in enabled_modalities:
             step1_modalities["Path"] = {
                 "kind": "image",
+                "type": "image",
                 "shape": "224×224×3",
                 "preview_png": generate_thumbnail(_generate_medical_image_sample("Path"), "medical_image"),
                 "plaintext_excerpt": "Pathology image for cancer detection"
@@ -1328,6 +1525,7 @@ async def run_cycle(selected_modalities: Optional[str] = None):
         if "Blood" in enabled_modalities:
             step1_modalities["Blood"] = {
                 "kind": "image",
+                "type": "image",
                 "shape": "224×224×3",
                 "preview_png": generate_thumbnail(_generate_medical_image_sample("Blood"), "medical_image"),
                 "plaintext_excerpt": "Blood cell image for hematology analysis"
