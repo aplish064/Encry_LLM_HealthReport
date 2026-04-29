@@ -1,5 +1,5 @@
 // frontend/assets/js/app.js
-const API_BASE = (window.API_BASE || "http://127.0.0.1:8081");
+const API_BASE = (window.API_BASE || "http://127.0.0.1:8082");
 
 const $ = (id) => document.getElementById(id);
 

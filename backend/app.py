@@ -30,9 +30,9 @@ SERVER_PY = os.path.join(os.path.dirname(__file__), "server.py")
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 DATA_PATHS = {
-    "UWB": os.path.join(BASE_DIR, "test_data", "uwb_sample.txt"),
-    "IMU": os.path.join(BASE_DIR, "test_data", "imu_sample.txt"),
-    "CSI": os.path.join(BASE_DIR, "test_data", "csi_sample.csv"),
+    "UWB": os.path.join(BASE_DIR, "test_data", "uwb_from_utar.txt"),
+    "IMU": os.path.join(BASE_DIR, "test_data", "imu_from_utar.txt"),
+    "CSI": os.path.join(BASE_DIR, "test_data", "csi_from_utar.csv"),
 }
 
 # user-provided (or auto-generated) images

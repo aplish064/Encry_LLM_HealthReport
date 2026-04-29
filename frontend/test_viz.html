@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试增强的可视化</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .test-section { margin: 20px 0; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .test-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #333; }
+        .test-image { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; }
+        .loading { color: #666; font-style: italic; }
+        .error { color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 4px; }
+        .success { color: #388e3c; background: #e8f5e9; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🧪 增强可视化测试页面</h1>
+    <p>从后端API获取最新的多通道可视化图表</p>
+
+    <div class="test-section">
+        <div class="test-title">📊 UWB 多通道预览 (3通道 - 叠加显示)</div>
+        <div id="uwb-preview" class="loading">加载中...</div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">📈 UWB FFT频谱分析 (3通道 - 峰值检测)</div>
+        <div id="uwb-fft" class="loading">加载中...</div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">📊 IMU 多通道预览 (6通道 - 2×3网格)</div>
+        <div id="imu-preview" class="loading">加载中...</div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">📈 IMU FFT频谱分析 (6通道 - 网格布局)</div>
+        <div id="imu-fft" class="loading">加载中...</div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">📊 CSI 多通道预览 (8通道 - 选择性显示 + 相关性热图)</div>
+        <div id="csi-preview" class="loading">加载中...</div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">📈 CSI FFT频谱分析 (6通道 - 网格布局)</div>
+        <div id="csi-fft" class="loading">加载中...</div>
+    </div>
+
+    <div class="test-section">
+        <div class="test-title">🔄 刷新按钮</div>
+        <button onclick="loadAllData()" style="padding: 10px 20px; font-size: 16px; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer;">重新加载数据</button>
+        <span id="status" style="margin-left: 10px; color: #666;"></span>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8082';
+
+        async function loadModalityData(modality) {
+            try {
+                const response = await fetch(`${API_BASE}/api/cycle`);
+                const data = await response.json();
+                const mod = data.step1.modalities[modality];
+
+                return {
+                    preview: mod.preview_png,
+                    fft: mod.fft_png,
+                    excerpt: mod.plaintext_excerpt
+                };
+            } catch (error) {
+                console.error(`Error loading ${modality}:`, error);
+                return null;
+            }
+        }
+
+        function displayImage(elementId, base64Data, modality) {
+            const element = document.getElementById(elementId);
+            if (base64Data) {
+                element.innerHTML = `<img src="data:image/png;base64,${base64Data}" alt="${modality}" class="test-image">`;
+                element.className = 'success';
+            } else {
+                element.innerHTML = '❌ 无法加载图像';
+                element.className = 'error';
+            }
+        }
+
+        async function loadAllData() {
+            const status = document.getElementById('status');
+            status.textContent = '加载中...';
+
+            // 加载UWB数据
+            const uwbData = await loadModalityData('UWB');
+            if (uwbData) {
+                displayImage('uwb-preview', uwbData.preview, 'UWB');
+                displayImage('uwb-fft', uwbData.fft, 'UWB FFT');
+            }
+
+            // 加载IMU数据
+            const imuData = await loadModalityData('IMU');
+            if (imuData) {
+                displayImage('imu-preview', imuData.preview, 'IMU');
+                displayImage('imu-fft', imuData.fft, 'IMU FFT');
+            }
+
+            // 加载CSI数据
+            const csiData = await loadModalityData('CSI');
+            if (csiData) {
+                displayImage('csi-preview', csiData.preview, 'CSI');
+                displayImage('csi-fft', csiData.fft, 'CSI FFT');
+            }
+
+            status.textContent = '✅ 加载完成！';
+        }
+
+        // 页面加载时自动加载数据
+        window.addEventListener('DOMContentLoaded', loadAllData);
+    </script>
+</body>
+</html>
