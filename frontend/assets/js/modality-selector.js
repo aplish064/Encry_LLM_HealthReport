@@ -2,9 +2,6 @@
  * 模态选择器 - 管理模态卡片交互
  */
 
-// API基础URL - 指向后端服务器
-const API_BASE = (window.API_BASE || "http://127.0.0.1:8082");
-
 class ModalitySelector {
   constructor() {
     this.selectedModalities = new Set();
@@ -33,7 +30,9 @@ class ModalitySelector {
 
   async loadModalities() {
     try {
-      const response = await this.fetchWithTimeout(`${API_BASE}/api/modalities`, {
+      // 使用全局API_BASE（在app.js中定义）
+      const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8082";
+      const response = await this.fetchWithTimeout(`${apiBase}/api/modalities`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -279,8 +278,10 @@ class ModalitySelector {
     try {
       this.updateProgress(20, `正在分析... (尝试 ${attempt}/${this.maxRetries})`);
 
+      // 使用全局API_BASE（在app.js中定义）
+      const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8082";
       const response = await this.fetchWithTimeout(
-        `${API_BASE}/api/cycle?selected_modalities=${encodeURIComponent(selectedList)}`,
+        `${apiBase}/api/cycle?selected_modalities=${encodeURIComponent(selectedList)}`,
         {
           method: 'GET',
           headers: {
@@ -494,13 +495,34 @@ class ModalitySelector {
 
     // 从步骤1数据中提取缩略图
     if (data.step1 && data.step1.modalities) {
-      data.step1.modalities.forEach(mod => {
-        if (mod.thumbnail) {
+      // 处理对象或数组格式
+      let modalitiesList = [];
+
+      if (Array.isArray(data.step1.modalities)) {
+        // 已经是数组
+        modalitiesList = data.step1.modalities;
+      } else if (typeof data.step1.modalities === 'object') {
+        // 是对象，转换为数组
+        modalitiesList = Object.values(data.step1.modalities).map(mod => {
+          // 如果mod是对象且有必要的属性
+          if (typeof mod === 'object' && mod !== null) {
+            return mod;
+          }
+          return null;
+        }).filter(mod => mod !== null);
+      }
+
+      // 显示缩略图
+      modalitiesList.forEach(mod => {
+        if (mod && (mod.thumbnail || mod.preview_png)) {
           const thumbnail = document.createElement('div');
           thumbnail.className = 'thumbnail-item';
+          const thumbnailData = mod.thumbnail || mod.preview_png;
+          const displayName = mod.name || mod.id || Object.keys(data.step1.modalities).find(key => data.step1.modalities[key] === mod) || 'Unknown';
+
           thumbnail.innerHTML = `
-            <img src="data:image/png;base64,${mod.thumbnail}" alt="${mod.name}">
-            <div class="thumbnail-label">${mod.name}</div>
+            <img src="data:image/png;base64,${thumbnailData}" alt="${displayName}">
+            <div class="thumbnail-label">${displayName}</div>
           `;
           thumbnailsGrid.appendChild(thumbnail);
         }
