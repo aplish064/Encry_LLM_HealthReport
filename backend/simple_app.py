@@ -48,6 +48,24 @@ MODALITY_CONFIG = {
 # Thread pool for parallel processing
 executor = ThreadPoolExecutor(max_workers=4)
 
+# 模态名称映射：完整名称 -> 简化名称
+MODALITY_NAME_MAP = {
+    "Depth Camera": "Depth",
+    "UWB Radar": "UWB",
+    "IMU Sensor": "IMU",
+    "WiFi CSI": "CSI",
+    "RGB Camera": "RGB",
+    "NTU RGB+D": "NTU",
+    "RetinaMNIST": "Retina",
+    "ChestMNIST": "Chest",
+    "PathMNIST": "Path",
+    "BloodMNIST": "Blood"
+}
+
+def normalize_modality_name(name: str) -> str:
+    """将模态完整名称转换为后端get_data函数期望的简化名称"""
+    return MODALITY_NAME_MAP.get(name, name)
+
 # 智谱AI配置
 ZHIPU_API_KEY = "3e53672cccc548629e749d7436098975.yVFwqfG0ATQ69Ro4"
 ZHIPU_API_URL = "https://open.bigmodel.cn/api/anthropic/v1/messages"
@@ -861,22 +879,57 @@ async def get_modalities():
 async def get_modality_thumbnail(modality: str):
     """获取指定模态的缩略图预览"""
     try:
+        # 标准化模态名称
+        normalized_name = normalize_modality_name(modality)
+        print(f"Thumbnail request: {modality} -> {normalized_name}")
+
         # 加载模态数据
-        data = get_data(modality)
+        try:
+            data = get_data(normalized_name)
+        except FileNotFoundError:
+            # 如果找不到数据文件，尝试使用备用方法
+            print(f"Data file not found for {normalized_name}, trying fallback")
+
+            # 对于图像模态，尝试直接加载
+            if normalized_name in ["Depth", "RGB"]:
+                data_path = DEPTH_PNG_PATH if normalized_name == "Depth" else RGB_PNG_PATH
+                if os.path.exists(data_path):
+                    from PIL import Image
+                    img = Image.open(data_path)
+                    data = np.array(img)
+                else:
+                    raise FileNotFoundError(f"Image file not found: {data_path}")
+            else:
+                raise
+
         if data is None:
             return {"thumbnail": None, "error": "Modality not found"}
 
         # 确定数据类型
         modality_config = load_modality_config()
-        mod_info = modality_config.get(modality, {})
-        data_type = mod_info.get("type", "sensor")
+
+        # 查找模态信息（尝试完整名称和简化名称）
+        mod_info = modality_config.get(modality, {}) or modality_config.get(normalized_name, {})
+
+        # 从配置中获取类型，或者根据模态名称推断
+        if isinstance(mod_info, dict):
+            data_type = mod_info.get("type", "sensor")
+        else:
+            # 根据模态名称推断类型
+            if normalized_name in ["Depth", "RGB", "Retina", "Chest", "Path", "Blood"]:
+                data_type = "image"
+            elif normalized_name == "NTU":
+                data_type = "skeleton"
+            else:
+                data_type = "timeseries"
 
         # 生成缩略图
         modality_type_map = {
             "timeseries": "timeseries",
             "image": "image",
             "medical_image": "image",
-            "skeleton": "skeleton"
+            "skeleton": "skeleton",
+            "sensor": "timeseries"
         }
         modality_type = modality_type_map.get(data_type, "timeseries")
 
@@ -886,6 +939,8 @@ async def get_modality_thumbnail(modality: str):
 
     except Exception as e:
         print(f"生成缩略图失败 ({modality}): {e}")
+        import traceback
+        traceback.print_exc()
         return {"thumbnail": None, "error": str(e)}
 
 @app.get("/api/cycle")
