@@ -140,14 +140,26 @@ def png_b64_from_file(path: str) -> Optional[str]:
 
 @lru_cache(maxsize=1)
 def load_modality_config() -> Dict[str, Any]:
-    """Load modality configuration from config.json or return default config.
+    """Load modality configuration from modality_config.json or return default config.
     Uses LRU cache to avoid repeated file reads.
     """
-    config_path = os.path.join(BASE_DIR, "backend", "config.json")
+    config_path = os.path.join(BASE_DIR, "backend", "modality_config.json")
     if os.path.exists(config_path):
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
+                # Convert from list format to dict format
+                if "modalities" in config and isinstance(config["modalities"], list):
+                    modality_dict = {}
+                    for mod in config["modalities"]:
+                        modality_dict[mod["name"]] = {
+                            "enabled": True,
+                            "type": mod.get("type", "sensor"),
+                            "id": mod.get("id", ""),
+                            "description": mod.get("description", ""),
+                            "icon": mod.get("icon", "")
+                        }
+                    return modality_dict
                 return config.get("modalities", MODALITY_CONFIG)
         except Exception as e:
             print(f"Warning: Failed to load config from {config_path}: {e}")
