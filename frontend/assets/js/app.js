@@ -674,6 +674,7 @@ $("ctResPreview").textContent = safeText(s2.aggregate_cipher_preview);
 
 window.addEventListener("DOMContentLoaded", () => {
   setupAnalysisTabs();
-  runCycle();
-  setInterval(runCycle, 10000000000);
+  // 禁用自动刷新，等待用户手动点击"开始分析"
+  // runCycle();
+  // setInterval(runCycle, 10000000000);
 });

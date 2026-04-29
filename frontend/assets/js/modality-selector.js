@@ -22,6 +22,9 @@ class ModalitySelector {
       await this.loadModalityThumbnails(); // 加载缩略图
       this.renderCards();
       this.attachEventListeners();
+
+      // 初始化Step 2模型集群（显示所有10个模型，但都变暗）
+      this.updateModelCluster();
     } catch (error) {
       console.error('模态选择器初始化失败:', error);
       this.showError('初始化失败，请刷新页面重试');
@@ -305,53 +308,55 @@ class ModalitySelector {
 
   updateModelCluster() {
     // 根据选中的模态更新Step 2的Homomorphic Prediction Model Cluster
+    // 始终显示所有10个模型，选中的高亮(不透明)，未选中的变暗
     const clusterGrid = document.getElementById('modelCluster');
     if (!clusterGrid) {
       console.warn('modelCluster element not found');
       return;
     }
 
-    // 清空现有内容
-    clusterGrid.innerHTML = '';
-
     // 模态ID到工具的映射关系（使用小写ID）
     const modalityToolMap = {
-      'depth': { id: 'sleep', title: 'Sleep Staging', subtitle: 'Depth-based Model', icon: '🛏️' },
-      'uwb': { id: 'bp', title: 'Blood Pressure', subtitle: 'UWB Regression', icon: '📡' },
-      'imu': { id: 'metabolic', title: 'Metabolic Score', subtitle: 'IMU Proxy', icon: '🏃' },
-      'csi': { id: 'ecg', title: 'ECG Arrhythmia', subtitle: 'CSI Heart Pattern', icon: '📶' },
-      'rgb': { id: 'risk', title: 'Risk Assessment', subtitle: 'RGB Triage', icon: '📷' },
-      'ntu': { id: 'action', title: 'Action Recognition', subtitle: 'Skeleton Model', icon: '🦴' },
-      'retina': { id: 'cardio', title: 'Cardiovascular', subtitle: 'Retina Analysis', icon: '👁️' },
-      'chest': { id: 'lung', title: 'Lung Screening', subtitle: 'X-ray Analysis', icon: '🫁' },
-      'path': { id: 'cancer', title: 'Cancer Detection', subtitle: 'Pathology Model', icon: '🔬' },
-      'blood': { id: 'blood', title: 'Blood Analysis', subtitle: 'Hematology Model', icon: '🩸' }
+      'depth': { id: 'sleep', title: 'Sleep Staging', subtitle: 'Depth-based Model' },
+      'uwb': { id: 'bp', title: 'Blood Pressure', subtitle: 'UWB Regression' },
+      'imu': { id: 'metabolic', title: 'Metabolic Score', subtitle: 'IMU Proxy' },
+      'csi': { id: 'ecg', title: 'ECG Arrhythmia', subtitle: 'CSI Heart Pattern' },
+      'rgb': { id: 'risk', title: 'Risk Assessment', subtitle: 'RGB Triage' },
+      'ntu': { id: 'action', title: 'Action Recognition', subtitle: 'Skeleton Model' },
+      'retina': { id: 'cardio', title: 'Cardiovascular', subtitle: 'Retina Analysis' },
+      'chest': { id: 'lung', title: 'Lung Screening', subtitle: 'X-ray Analysis' },
+      'path': { id: 'cancer', title: 'Cancer Detection', subtitle: 'Pathology Model' },
+      'blood': { id: 'blood', title: 'Blood Analysis', subtitle: 'Hematology Model' }
     };
 
-    console.log('Selected modalities:', Array.from(this.selectedModalities));
-
-    // 为每个选中的模态创建工具卡片
-    this.selectedModalities.forEach(modalityId => {
-      const tool = modalityToolMap[modalityId];
-      if (tool) {
+    // 只在第一次初始化时创建所有模型卡片
+    if (clusterGrid.children.length === 0) {
+      Object.keys(modalityToolMap).forEach(modalityId => {
+        const tool = modalityToolMap[modalityId];
         const toolCard = document.createElement('div');
         toolCard.className = 'clusterCard';
+        toolCard.id = `model-${modalityId}`;
+        toolCard.style.opacity = '0.3';
+        toolCard.style.transition = 'opacity 0.3s ease';
+
         toolCard.innerHTML = `
-          <div class="clusterIcon">${tool.icon}</div>
           <div class="clusterCardTitle">${tool.title}</div>
           <div class="clusterCardSubtitle">${tool.subtitle}</div>
         `;
         clusterGrid.appendChild(toolCard);
-        console.log(`Added tool card for ${modalityId}:`, tool);
-      } else {
-        console.warn(`No tool mapping found for ${modalityId}`);
+      });
+    }
+
+    // 更新所有模型的透明度
+    Object.keys(modalityToolMap).forEach(modalityId => {
+      const toolCard = document.getElementById(`model-${modalityId}`);
+      if (toolCard) {
+        const isSelected = this.selectedModalities.has(modalityId);
+        toolCard.style.opacity = isSelected ? '1' : '0.3';
       }
     });
 
-    // 如果没有选中任何模态，显示提示
-    if (this.selectedModalities.size === 0) {
-      clusterGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #6b7280; padding: 20px;">请选择模态以查看对应的工具</div>';
-    }
+    console.log('Updated model cluster, selected:', Array.from(this.selectedModalities));
   }
 
   showWarning(message) {
@@ -601,11 +606,50 @@ class ModalitySelector {
     // 隐藏进度条
     this.hideProgress();
 
+    // 调用app.js中的渲染函数来更新UI
+    console.log('Rendering results with data:', data);
+
+    // Step 1: 渲染模态数据
+    if (typeof renderModalities === 'function') {
+      renderModalities(data.step1?.modalities || {});
+      console.log('✅ Rendered modalities');
+    }
+
+    // Step 2: 渲染模型集群和密文预览
+    if (typeof renderCluster === 'function') {
+      const s2 = data.step2 || {};
+      renderCluster(s2.cluster_models || [], s2.assignments || []);
+
+      // 更新密文预览
+      const ctPreview = document.getElementById('ctResPreview');
+      if (ctPreview && s2.aggregate_cipher_preview) {
+        ctPreview.textContent = s2.aggregate_cipher_preview;
+      }
+      console.log('✅ Rendered cluster');
+    }
+
+    // Step 3: 渲染结果和报告
+    if (typeof renderResults === 'function') {
+      const s3 = data.step3 || {};
+      renderResults(s3.results || []);
+      console.log('✅ Rendered results');
+
+      // 渲染报告
+      if (typeof renderHealthReport === 'function' && s3.report) {
+        renderHealthReport(s3.report);
+
+        const conclusionPanel = document.getElementById('conclusionPanel');
+        const recommendPanel = document.getElementById('recommendPanel');
+        const reportText = document.getElementById('reportText');
+
+        if (conclusionPanel) conclusionPanel.style.display = 'block';
+        if (recommendPanel) recommendPanel.style.display = 'block';
+        if (reportText) reportText.style.display = 'none';
+      }
+    }
+
     // 显示缩略图
     this.showThumbnails(data);
-
-    // 触发结果更新事件
-    window.dispatchEvent(new CustomEvent('analysisComplete', { detail: data }));
   }
 
   showThumbnails(data) {
