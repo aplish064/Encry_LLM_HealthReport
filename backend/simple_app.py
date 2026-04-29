@@ -792,6 +792,31 @@ async def health_check():
     """健康检查"""
     return {"status": "healthy", "version": "3.1-complete", "timestamp": time.time()}
 
+@app.get("/api/modalities")
+async def get_modalities():
+    """获取所有可用的模态配置"""
+    try:
+        config_path = os.path.join(BASE_DIR, "backend", "modality_config.json")
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        return config
+    except Exception as e:
+        # 如果配置文件不存在，返回默认配置
+        return {
+            "modalities": [
+                {"id": "depth", "name": "深度图像", "type": "image", "description": "睡眠姿态检测", "icon": "🛏️"},
+                {"id": "uwb", "name": "UWB雷达", "type": "timeseries", "description": "心率、血压监测", "icon": "📡"},
+                {"id": "imu", "name": "IMU传感器", "type": "timeseries", "description": "步态分析、代谢评估", "icon": "🏃"},
+                {"id": "csi", "name": "CSI信号", "type": "timeseries", "description": "心率、呼吸监测", "icon": "📶"},
+                {"id": "rgb", "name": "RGB图像", "type": "image", "description": "风险评分、跌倒检测", "icon": "📷"},
+                {"id": "ntu", "name": "NTU骨骼", "type": "skeleton", "description": "动作识别、行为分析", "icon": "🦴"},
+                {"id": "retina", "name": "视网膜图像", "type": "medical_image", "description": "心血管疾病早期预警", "icon": "👁️"},
+                {"id": "chest", "name": "胸部X光", "type": "medical_image", "description": "肺部疾病筛查", "icon": "🫁"},
+                {"id": "path", "name": "组织病理", "type": "medical_image", "description": "癌症筛查", "icon": "🔬"},
+                {"id": "blood", "name": "血细胞", "type": "medical_image", "description": "血液疾病诊断", "icon": "🩸"}
+            ]
+        }
+
 @app.get("/api/cycle")
 async def run_cycle(selected_modalities: Optional[str] = None):
     """执行完整的数据处理周期 - 支持选择性模态加载
