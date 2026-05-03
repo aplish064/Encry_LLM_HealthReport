@@ -39,7 +39,7 @@ class ModalitySelector {
   async loadModalities() {
     try {
       // 使用全局API_BASE（在app.js中定义）
-      const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8082";
+      const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8080";
       const response = await this.fetchWithTimeout(`${apiBase}/api/modalities`, {
         method: 'GET',
         headers: {
@@ -72,7 +72,7 @@ class ModalitySelector {
 
   async loadModalityThumbnails() {
     // 加载每个模态的缩略图预览
-    const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8082";
+    const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8080";
 
     console.log('开始加载缩略图...');
 
@@ -442,6 +442,9 @@ class ModalitySelector {
       this.setLoadingState(true);
       this.showProgress();
       this.updateProgress(10, '准备分析...');
+      if (typeof setWorkflowStep === 'function') {
+        setWorkflowStep('model');
+      }
 
       // 调用后端API进行分析，带重试机制
       const data = await this.launchAnalysisWithRetry(selectedList);
@@ -461,33 +464,49 @@ class ModalitySelector {
 
   async launchAnalysisWithRetry(selectedList, attempt = 1) {
     try {
-      this.updateProgress(20, `正在分析... (尝试 ${attempt}/${this.maxRetries})`);
+      this.updateProgress(20, `Dispatching encrypted inference... (${attempt}/${this.maxRetries})`);
+      const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8080";
 
-      // 使用全局API_BASE（在app.js中定义）
-      const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8082";
-      const response = await this.fetchWithTimeout(
-        `${apiBase}/api/cycle?selected_modalities=${encodeURIComponent(selectedList)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      if (typeof setWorkflowStep === 'function') {
+        setWorkflowStep('model');
       }
+      const dispatchData = await this.fetchJson(
+        `${apiBase}/api/dispatch?selected_modalities=${encodeURIComponent(selectedList)}`
+      );
+      this.renderDispatchStage(dispatchData);
 
-      this.updateProgress(80, '处理结果...');
+      if (typeof setWorkflowStep === 'function') {
+        setWorkflowStep('privacy');
+      }
+      this.updateProgress(55, 'Generating synthetic candidate pool and shuffling outputs...');
+      const privacyData = await this.fetchJson(
+        `${apiBase}/api/privacy_shuffle?session_id=${encodeURIComponent(dispatchData.session_id)}`
+      );
+      this.renderPrivacyStage(privacyData);
+      await this.wait(7000);
 
-      const data = await response.json();
+      if (typeof setWorkflowStep === 'function') {
+        setWorkflowStep('report');
+      }
+      this.updateProgress(85, 'Generating protected health report...');
+      const reportData = await this.fetchJson(
+        `${apiBase}/api/report?session_id=${encodeURIComponent(dispatchData.session_id)}`
+      );
 
       // 重置重试计数
       this.retryCount = 0;
 
-      return data;
+      return {
+        schema: "he-multimodal-staged-cycle/v1",
+        session_id: dispatchData.session_id,
+        generated_at: dispatchData.generated_at,
+        step1: dispatchData.step1,
+        step2: dispatchData.step2,
+        step3: reportData.step3,
+        privacy_protection: reportData.privacy_protection || privacyData.privacy_protection,
+        data_source: reportData.data_source || dispatchData.data_source,
+        llm_provider: reportData.llm_provider || dispatchData.llm_provider,
+      };
 
     } catch (error) {
       console.error(`分析尝试 ${attempt} 失败:`, error);
@@ -506,6 +525,67 @@ class ModalitySelector {
         // 达到最大重试次数
         throw error;
       }
+    }
+  }
+
+  wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async fetchJson(url) {
+    const response = await this.fetchWithTimeout(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.error) {
+      throw new Error(data.error || data.message || `HTTP error! status: ${response.status}`);
+    }
+    return data;
+  }
+
+  renderDispatchStage(data) {
+    if (typeof renderModalities === 'function') {
+      renderModalities(data.step1?.modalities || {});
+      if (typeof ModalityCards !== 'undefined' && data.step1?.modalities) {
+        this.redrawCardsWithCanvas(data.step1.modalities);
+      }
+    }
+
+    if (typeof renderCluster === 'function') {
+      const s2 = data.step2 || {};
+      renderCluster(s2.cluster_models || [], s2.assignments || []);
+      const ctPreview = document.getElementById('ctResPreview');
+      if (ctPreview && s2.aggregate_cipher_preview) {
+        ctPreview.textContent = s2.aggregate_cipher_preview;
+      }
+    }
+
+    const tUpload = document.getElementById('tUpload');
+    if (tUpload && data.step1?.time_sec !== undefined) {
+      tUpload.className = 'pill success';
+      tUpload.textContent = `Done (${data.step1.time_sec.toFixed(2)}s)`;
+    }
+
+    const tDispatch = document.getElementById('tDispatch');
+    if (tDispatch && data.step2?.time_sec !== undefined) {
+      tDispatch.className = 'pill success';
+      tDispatch.textContent = `Done (${data.step2.time_sec.toFixed(1)}s)`;
+    }
+  }
+
+  renderPrivacyStage(data) {
+    const privacy = data.privacy_protection || {};
+    const tProtect = document.getElementById('tProtect');
+    if (tProtect) {
+      tProtect.className = 'pill success';
+      tProtect.textContent = privacy.enabled ? 'Done' : 'Unavailable';
+    }
+    if (typeof renderPrivacyProtection === 'function') {
+      renderPrivacyProtection(privacy);
     }
   }
 
@@ -541,11 +621,11 @@ class ModalitySelector {
     if (analyzeBtn) {
       if (loading) {
         analyzeBtn.disabled = true;
-        analyzeBtn.textContent = '分析中...';
+        analyzeBtn.textContent = 'Analyzing...';
         analyzeBtn.style.opacity = '0.6';
       } else {
         analyzeBtn.disabled = this.selectedModalities.size === 0;
-        analyzeBtn.textContent = '开始分析';
+        analyzeBtn.textContent = 'Run Analysis';
         analyzeBtn.style.opacity = '1';
       }
     }
@@ -572,6 +652,18 @@ class ModalitySelector {
     }
 
     // 同时更新Step 3的状态标签
+    const tProtect = document.getElementById('tProtect');
+    if (tProtect) {
+      if (loading) {
+        tProtect.className = 'pill running';
+        tProtect.textContent = 'Shuffling';
+      } else if (!tProtect.textContent.includes('Done')) {
+        tProtect.className = 'pill';
+        tProtect.textContent = '—';
+      }
+    }
+
+    // 同时更新Step 4的状态标签
     const tDecrypt = document.getElementById('tDecrypt');
     if (tDecrypt) {
       if (loading) {
@@ -698,12 +790,26 @@ class ModalitySelector {
     console.log('Rendering results with data:', data);
 
     // 更新Step 3状态为完成
+    const tProtect = document.getElementById('tProtect');
+    const privacy = data.privacy_protection || {};
+    if (tProtect) {
+      tProtect.className = 'pill success';
+      tProtect.textContent = privacy.enabled ? 'Done' : 'Unavailable';
+      console.log(`✅ Step 3 status updated: ${tProtect.textContent}`);
+    }
+
+    if (typeof renderPrivacyProtection === 'function') {
+      renderPrivacyProtection(privacy);
+      console.log('✅ Rendered privacy protection stage');
+    }
+
+    // 更新Step 4状态为完成
     const tDecrypt = document.getElementById('tDecrypt');
     if (tDecrypt && data.step3) {
       const timeSec = data.step3.time_sec || 0;
       tDecrypt.className = 'pill success';
       tDecrypt.textContent = `Done (${timeSec.toFixed(1)}s)`;
-      console.log(`✅ Step 3 status updated: Done (${timeSec.toFixed(1)}s)`);
+      console.log(`✅ Step 4 status updated: Done (${timeSec.toFixed(1)}s)`);
     }
 
     // Step 1: 渲染模态数据
@@ -746,7 +852,7 @@ class ModalitySelector {
       console.log('✅ Rendered cluster');
     }
 
-    // Step 3: 渲染结果和报告
+    // Step 4: 渲染结果和报告
     if (typeof renderResults === 'function') {
       const s3 = data.step3 || {};
       renderResults(s3.results || []);
@@ -758,7 +864,7 @@ class ModalitySelector {
         if (s3.results && s3.results.length > 0) {
           const count = s3.results.length;
           const modalityNames = s3.results.map(r => r.input_modality).join(', ');
-          resultsTitle.textContent = `Key results (${count} modalities: ${modalityNames})`;
+          resultsTitle.textContent = `Key results (${count} protected modalities: ${modalityNames})`;
           console.log(`✅ Results title updated: ${resultsTitle.textContent}`);
         } else {
           resultsTitle.textContent = 'Key results (no data)';
@@ -768,6 +874,9 @@ class ModalitySelector {
       // 渲染报告
       if (typeof renderHealthReport === 'function' && s3.report) {
         renderHealthReport(s3.report);
+        if (typeof setWorkflowStep === 'function') {
+          setWorkflowStep('report');
+        }
 
         const conclusionPanel = document.getElementById('conclusionPanel');
         const recommendPanel = document.getElementById('recommendPanel');
@@ -851,7 +960,7 @@ class ModalitySelector {
     const thumbnailsGrid = document.getElementById('thumbnailsGrid');
     if (!thumbnailsGrid) return;
 
-    thumbnailsGrid.style.display = 'grid';
+    thumbnailsGrid.style.display = 'none';  // 隐藏缩略图网格，避免重复显示
     thumbnailsGrid.innerHTML = '';
 
     // 从步骤1数据中提取缩略图

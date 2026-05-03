@@ -3,6 +3,29 @@ const API_BASE = (window.API_BASE || "http://127.0.0.1:8082");
 
 const $ = (id) => document.getElementById(id);
 
+const WORKFLOW_PANEL_BY_STEP = {
+  select: "stepUpload",
+  model: "stepDispatch",
+  privacy: "stepProtect",
+  report: "stepDecrypt",
+};
+
+function setWorkflowStep(stepName) {
+  const activePanelId = WORKFLOW_PANEL_BY_STEP[stepName] || WORKFLOW_PANEL_BY_STEP.select;
+
+  document.querySelectorAll(".step[data-step]").forEach((step) => {
+    step.classList.remove("active");
+    if (step.dataset.step === stepName) step.classList.add("active");
+  });
+
+  document.querySelectorAll(".workflow-panel").forEach((panel) => {
+    panel.classList.remove("active-panel");
+  });
+
+  const activePanel = $(activePanelId);
+  if (activePanel) activePanel.classList.add("active-panel");
+}
+
 function showSpinner(id, show) {
   const el = $(id);
   if (!el) return;
@@ -488,6 +511,73 @@ function renderDetailedAnalysis(modality) {
   panel.innerHTML = html;
 }
 
+function renderPrivacyProtection(privacy) {
+  const panel = $("privacyPanel");
+  if (!panel) return;
+  if (!privacy || !privacy.enabled) {
+    panel.innerHTML = '<div class="hint">隐私保护数据暂不可用。</div>';
+    return;
+  }
+
+  const pipeline = [
+    { label: "候选池", detail: "根据加密推理结果生成相似的合成候选。" },
+    { label: "混洗", detail: "随机打乱候选顺序，切断直接对应关系。" },
+    { label: "关联掩蔽", detail: "只暴露摘要候选，不暴露原始模型输出。" },
+    { label: "受保护输出", detail: "从混洗候选中选择最终报告来源。" },
+  ];
+  const poolSize = Math.min(Number(privacy.pool_size || privacy.metrics?.pool_size || 10), 10);
+  const tokens = Array.from({ length: poolSize }, (_, index) => {
+    const slot = ((index * 7) % 10) + 1;
+    return `<div class="mixerToken" style="--slot:${slot}; --delay:${700 + index * 130}ms">C${index + 1}</div>`;
+  }).join("");
+
+  const pipelineHtml = pipeline.map((stage, index) => `
+    <div class="privacyStage ${index === pipeline.length - 1 ? "active" : ""}" style="--delay:${index * 1400}ms">
+      <div class="privacyStageIndex">${index + 1}</div>
+      <div>
+        <div class="privacyStageTitle">${escHtml(stage.label)}</div>
+        <div class="privacyStageDetail">${escHtml(stage.detail || "")}</div>
+      </div>
+    </div>
+  `).join("");
+
+  panel.innerHTML = `
+    <div class="privacySummary">
+      <strong>隐私混洗器已启动。</strong>
+      原始推理结果不会直接进入报告，而是先混入合成候选池，再通过混洗和关联掩蔽生成受保护输出。
+    </div>
+    <div class="privacyMixer">
+      <div class="mixerColumn mixerRaw">
+        <div class="mixerLabel">原始加密推理摘要</div>
+        <div class="rawResultCard">
+          <strong>Raw profile</strong>
+          <span>风险摘要 / 生理指标 / 模型评分</span>
+        </div>
+      </div>
+      <div class="mixerArrow">→</div>
+      <div class="mixerColumn mixerPool">
+        <div class="mixerLabel">候选池</div>
+        <div class="mixerTokenGrid">${tokens}</div>
+      </div>
+      <div class="mixerArrow">→</div>
+      <div class="mixerColumn mixerShuffle">
+        <div class="mixerLabel">混洗通道</div>
+        <div class="shuffleChamber">
+          <div class="shuffleLine"></div>
+          <div class="shuffleLine"></div>
+          <div class="shuffleLine"></div>
+        </div>
+      </div>
+      <div class="mixerArrow">→</div>
+      <div class="mixerColumn mixerProtected">
+        <div class="mixerLabel">受保护输出</div>
+        <div class="protectedOutputCard">Protected Output</div>
+      </div>
+    </div>
+    <div class="privacyPipeline">${pipelineHtml}</div>
+  `;
+}
+
 function renderHealthReport(report) {
   const panel = $("conclusionPanel");
   const recoPanel = $("recommendPanel");
@@ -617,6 +707,11 @@ $("ctResPreview").textContent = safeText(s2.aggregate_cipher_preview);
     setPill("tDispatch", `dispatch+infer ${fmtSec(s2.time_sec)}`);
 
     // step 3
+    const privacy = data.privacy_protection || {};
+    renderPrivacyProtection(privacy);
+    setPill("tProtect", privacy.enabled ? "protected" : "unavailable");
+
+    // step 4
     const s3 = data.step3 || {};
     console.log("Step 3 data:", s3);
     console.log("Results array:", s3.results);
@@ -647,6 +742,7 @@ $("ctResPreview").textContent = safeText(s2.aggregate_cipher_preview);
     console.error(e);
     setPill("tUpload", "error");
     setPill("tDispatch", "error");
+    setPill("tProtect", "error");
     setPill("tDecrypt", "error");
     if ($("conclusionPanel")) {
       $("conclusionPanel").style.display = "block";
@@ -674,6 +770,7 @@ $("ctResPreview").textContent = safeText(s2.aggregate_cipher_preview);
 
 window.addEventListener("DOMContentLoaded", () => {
   console.log('🟢 DOMContentLoaded事件触发');
+  setWorkflowStep("select");
   setupAnalysisTabs();
   // 完全禁用自动刷新 - 只通过用户点击"开始分析"按钮触发
   // runCycle();
@@ -691,14 +788,19 @@ window.addEventListener("DOMContentLoaded", () => {
   // 初始化时清空Step 2和Step 3的内容
   const modelCluster = document.getElementById('modelCluster');
   if (modelCluster) {
-    modelCluster.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 40px;">请先选择数据模态，然后点击"开始分析"按钮</div>';
+    modelCluster.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 40px;">Select modalities, then run analysis to activate model dispatch.</div>';
     console.log('✅ Step 2占位符已设置');
   }
 
   const resultTable = document.querySelector('#resultTable tbody');
   if (resultTable) {
-    resultTable.innerHTML = '<tr><td colspan="4" style="text-align:center; color: #9ca3af; padding: 20px;">请先选择数据模态并点击"开始分析"</td></tr>';
+    resultTable.innerHTML = '<tr><td colspan="4" style="text-align:center; color: #9ca3af; padding: 20px;">Select modalities and run analysis to populate results.</td></tr>';
     console.log('✅ Step 3占位符已设置');
+  }
+
+  const privacyPanel = document.getElementById('privacyPanel');
+  if (privacyPanel) {
+    privacyPanel.innerHTML = 'Select modalities and run analysis to generate protected candidates.';
   }
 
   const resultsTitle = document.getElementById('resultsTitle');
@@ -708,12 +810,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const recommendPanel = document.getElementById('recommendPanel');
   if (recommendPanel) {
-    recommendPanel.innerHTML = '请先选择数据模态并点击"开始分析"';
+    recommendPanel.innerHTML = 'Recommendations will appear after analysis.';
   }
 
   const conclusionPanel = document.getElementById('conclusionPanel');
   if (conclusionPanel) {
-    conclusionPanel.innerHTML = '请先选择数据模态并点击"开始分析"';
+    conclusionPanel.innerHTML = 'Report status will appear after analysis.';
   }
 
   console.log('✅ 页面初始化完成');
