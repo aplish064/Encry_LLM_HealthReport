@@ -1,5 +1,5 @@
 /**
- * 模态选择器 - 管理模态卡片交互
+ * Modality selector and interaction logic.
  */
 
 class ModalitySelector {
@@ -11,12 +11,13 @@ class ModalitySelector {
     this.retryCount = 0;
     this.maxRetries = 3;
     this.apiTimeout = 30000; // 30 seconds
+    this.reportTimeoutMs = 45000; // 45 seconds for report generation
     this.modalityThumbnails = {}; // 存储模态缩略图
     this.init();
   }
 
   async init() {
-    console.log('🔵 ModalitySelector初始化开始');
+    console.log('🔵 ModalitySelector initialization started');
     try {
       this.setLoadingState(true);
       await this.loadModalities();
@@ -24,13 +25,13 @@ class ModalitySelector {
       this.renderCards();
       this.attachEventListeners();
 
-      // 初始化Step 2模型集群（显示所有10个模型，但都变暗）
-      console.log('🔵 调用updateModelCluster进行初始化');
+      // Initialize Step 2 model cluster (show all 10 models, dimmed by default)
+      console.log('🔵 Initializing model cluster');
       this.updateModelCluster();
-      console.log('✅ ModalitySelector初始化完成');
+      console.log('✅ ModalitySelector initialization complete');
     } catch (error) {
-      console.error('❌ 模态选择器初始化失败:', error);
-      this.showError('初始化失败，请刷新页面重试');
+      console.error('❌ ModalitySelector initialization failed:', error);
+      this.showError('Initialization failed. Please refresh and try again.');
     } finally {
       this.setLoadingState(false);
     }
@@ -39,7 +40,9 @@ class ModalitySelector {
   async loadModalities() {
     try {
       // 使用全局API_BASE（在app.js中定义）
-      const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8080";
+      const apiBase = (typeof API_BASE !== 'undefined')
+        ? API_BASE
+        : `${window.location.protocol}//${window.location.hostname}:8082`;
       const response = await this.fetchWithTimeout(`${apiBase}/api/modalities`, {
         method: 'GET',
         headers: {
@@ -54,32 +57,34 @@ class ModalitySelector {
       const data = await response.json();
       this.modalities = data.modalities || [];
     } catch (error) {
-      console.error('加载模态配置失败:', error);
+      console.error('Failed to load modality configuration:', error);
 
       if (error.name === 'AbortError') {
-        throw new Error('请求超时，请检查网络连接');
+        throw new Error('Request timed out. Please check your network connection.');
       }
 
       if (!navigator.onLine) {
-        throw new Error('网络连接已断开，请检查网络');
+        throw new Error('Network is offline. Please check connection.');
       }
 
       // 使用默认配置
       this.modalities = this.getDefaultModalities();
-      this.showWarning('使用默认模态配置');
+      this.showWarning('Using fallback modality configuration');
     }
   }
 
   async loadModalityThumbnails() {
     // 加载每个模态的缩略图预览
-    const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8080";
+    const apiBase = (typeof API_BASE !== 'undefined')
+      ? API_BASE
+      : `${window.location.protocol}//${window.location.hostname}:8082`;
 
-    console.log('开始加载缩略图...');
+    console.log('Loading modality thumbnails...');
 
     // 为每个模态请求缩略图
     const thumbnailPromises = this.modalities.map(async (modality) => {
       try {
-        console.log(`正在加载 ${modality.name} 的缩略图...`);
+        console.log(`Loading thumbnail for ${modality.name}...`);
 
         const response = await this.fetchWithTimeout(
           `${apiBase}/api/modality_thumbnail?modality=${encodeURIComponent(modality.name)}`,
@@ -138,72 +143,72 @@ class ModalitySelector {
     return [
       {
         id: 'depth',
-        name: '深度图像',
+        name: 'Depth Camera',
         type: 'image',
-        description: '睡眠姿态检测',
+        description: 'Sleep posture detection',
         icon: '🛏️'
       },
       {
         id: 'uwb',
-        name: 'UWB雷达',
+        name: 'UWB Radar',
         type: 'timeseries',
-        description: '心率、血压监测',
+        description: 'Heart rate and blood pressure monitoring',
         icon: '📡'
       },
       {
         id: 'imu',
-        name: 'IMU传感器',
+        name: 'IMU Sensor',
         type: 'timeseries',
-        description: '步态分析、代谢评估',
+        description: 'Gait analysis and metabolic assessment',
         icon: '🏃'
       },
       {
         id: 'csi',
-        name: 'CSI信号',
+        name: 'WiFi CSI',
         type: 'timeseries',
-        description: '心率、呼吸监测',
+        description: 'Heart rate and respiratory monitoring',
         icon: '📶'
       },
       {
         id: 'rgb',
-        name: 'RGB图像',
+        name: 'RGB Camera',
         type: 'image',
-        description: '风险评分、跌倒检测',
+        description: 'Risk scoring and activity assessment',
         icon: '📷'
       },
       {
         id: 'ntu',
-        name: 'NTU骨骼',
+        name: 'NTU Skeleton',
         type: 'skeleton',
-        description: '动作识别、行为分析',
+        description: 'Action recognition and behavior analysis',
         icon: '🦴'
       },
       {
         id: 'retina',
-        name: '视网膜图像',
+        name: 'Retina Image',
         type: 'medical_image',
-        description: '心血管疾病早期预警',
+        description: 'Early cardiovascular risk screening',
         icon: '👁️'
       },
       {
         id: 'chest',
-        name: '胸部X光',
+        name: 'Chest X-ray',
         type: 'medical_image',
-        description: '肺部疾病筛查',
+        description: 'Lung condition screening',
         icon: '🫁'
       },
       {
         id: 'path',
-        name: '组织病理',
+        name: 'Pathology Image',
         type: 'medical_image',
-        description: '癌症筛查',
+        description: 'Cancer screening',
         icon: '🔬'
       },
       {
         id: 'blood',
-        name: '血细胞',
+        name: 'Blood Cell Image',
         type: 'medical_image',
-        description: '血液疾病诊断',
+        description: 'Hematology screening',
         icon: '🩸'
       }
     ];
@@ -281,7 +286,6 @@ class ModalitySelector {
         card.innerHTML = `
           <div class="card-title">${modality.name}</div>
           ${iconDisplay}
-          <div class="card-desc">${modality.description}</div>
         `;
 
         container.appendChild(card);
@@ -323,7 +327,7 @@ class ModalitySelector {
     } else {
       // 检查是否超过最大选择数
       if (this.selectedModalities.size >= this.maxSelection) {
-        this.showWarning(`最多只能选择${this.maxSelection}种模态`);
+        this.showWarning(`You can select up to ${this.maxSelection} modalities.`);
         return;
       }
 
@@ -419,13 +423,13 @@ class ModalitySelector {
     console.log('🚀 launchAnalysis被调用');
     if (this.selectedModalities.size === 0) {
       console.warn('⚠️ 没有选择任何模态，取消分析');
-      this.showWarning('请至少选择一种模态');
+      this.showWarning('Please select at least one modality.');
       return;
     }
 
     if (this.isLoading) {
       console.warn('⚠️ 正在处理中，忽略重复调用');
-      this.showWarning('正在处理中，请稍候...');
+      this.showWarning('Processing in progress. Please wait.');
       return;
     }
 
@@ -441,7 +445,7 @@ class ModalitySelector {
     try {
       this.setLoadingState(true);
       this.showProgress();
-      this.updateProgress(10, '准备分析...');
+      this.updateProgress(10, 'Preparing analysis...');
       if (typeof setWorkflowStep === 'function') {
         setWorkflowStep('model');
       }
@@ -449,13 +453,13 @@ class ModalitySelector {
       // 调用后端API进行分析，带重试机制
       const data = await this.launchAnalysisWithRetry(selectedList);
 
-      this.updateProgress(100, '分析完成');
+      this.updateProgress(100, 'Analysis completed.');
 
       // 处理结果
       this.handleResults(data);
 
     } catch (error) {
-      console.error('分析失败:', error);
+      console.error('Analysis failed:', error);
       this.handleAnalysisError(error);
     } finally {
       this.setLoadingState(false);
@@ -465,7 +469,9 @@ class ModalitySelector {
   async launchAnalysisWithRetry(selectedList, attempt = 1) {
     try {
       this.updateProgress(20, `Dispatching encrypted inference... (${attempt}/${this.maxRetries})`);
-      const apiBase = (typeof API_BASE !== 'undefined') ? API_BASE : "http://127.0.0.1:8080";
+      const apiBase = (typeof API_BASE !== 'undefined')
+        ? API_BASE
+        : `${window.location.protocol}//${window.location.hostname}:8082`;
 
       if (typeof setWorkflowStep === 'function') {
         setWorkflowStep('model');
@@ -483,14 +489,15 @@ class ModalitySelector {
         `${apiBase}/api/privacy_shuffle?session_id=${encodeURIComponent(dispatchData.session_id)}`
       );
       this.renderPrivacyStage(privacyData);
-      await this.wait(7000);
+      await this.wait(10500);
 
       if (typeof setWorkflowStep === 'function') {
         setWorkflowStep('report');
       }
       this.updateProgress(85, 'Generating protected health report...');
       const reportData = await this.fetchJson(
-        `${apiBase}/api/report?session_id=${encodeURIComponent(dispatchData.session_id)}`
+        `${apiBase}/api/report?session_id=${encodeURIComponent(dispatchData.session_id)}`,
+        { timeout: this.reportTimeoutMs }
       );
 
       // 重置重试计数
@@ -515,7 +522,7 @@ class ModalitySelector {
         this.retryCount = attempt;
 
         // 显示重试提示
-        this.updateProgress(0, `分析失败，${2}秒后重试...`);
+        this.updateProgress(0, `Analysis failed, retrying in ${2} seconds...`);
 
         // 等待2秒后重试
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -532,17 +539,36 @@ class ModalitySelector {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  async fetchJson(url) {
+  formatSeconds(value, digits = 1) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) {
+      return "—";
+    }
+    return `${n.toFixed(digits)}s`;
+  }
+
+  safeText(value, fallback = "—") {
+    if (value === null || value === undefined) return fallback;
+    const str = String(value).trim();
+    return str.length ? str : fallback;
+  }
+
+  async fetchJson(url, options = {}) {
+    const { timeout, ...fetchOptions } = options;
     const response = await this.fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
-      }
-    });
+      },
+      ...fetchOptions
+    }, timeout);
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.error) {
       throw new Error(data.error || data.message || `HTTP error! status: ${response.status}`);
+    }
+    if (!data || typeof data !== 'object') {
+      throw new Error(`Invalid API response for ${url}`);
     }
     return data;
   }
@@ -567,18 +593,21 @@ class ModalitySelector {
     const tUpload = document.getElementById('tUpload');
     if (tUpload && data.step1?.time_sec !== undefined) {
       tUpload.className = 'pill success';
-      tUpload.textContent = `Done (${data.step1.time_sec.toFixed(2)}s)`;
+      tUpload.textContent = `Done (${this.formatSeconds(data.step1.time_sec, 2)})`;
     }
 
     const tDispatch = document.getElementById('tDispatch');
     if (tDispatch && data.step2?.time_sec !== undefined) {
       tDispatch.className = 'pill success';
-      tDispatch.textContent = `Done (${data.step2.time_sec.toFixed(1)}s)`;
+      tDispatch.textContent = `Done (${this.formatSeconds(data.step2.time_sec, 1)})`;
     }
   }
 
   renderPrivacyStage(data) {
-    const privacy = data.privacy_protection || {};
+    const privacy = {
+      ...(data.privacy_protection || {}),
+      plaintext_prompt: data.plaintext_prompt || data.llm_prompt || (data.step3 ? (data.step3.plaintext_prompt || data.step3.llm_prompt) : ""),
+    };
     const tProtect = document.getElementById('tProtect');
     if (tProtect) {
       tProtect.className = 'pill success';
@@ -592,24 +621,24 @@ class ModalitySelector {
   handleAnalysisError(error) {
     this.hideProgress();
 
-    let errorMessage = '分析失败，请重试';
+    let errorMessage = 'Analysis failed. Please retry.';
 
     if (error.message.includes('timeout') || error.name === 'AbortError') {
-      errorMessage = '请求超时，请检查网络连接后重试';
+      errorMessage = 'Request timed out. Check the network and retry.';
     } else if (!navigator.onLine) {
-      errorMessage = '网络连接已断开，请检查网络';
+      errorMessage = 'Network appears offline. Check your connection.';
     } else if (error.message.includes('500')) {
-      errorMessage = '服务器内部错误，请稍后重试';
+      errorMessage = 'Server internal error. Please retry later.';
     } else if (error.message.includes('404')) {
-      errorMessage = '请求的资源不存在，请检查模态配置';
+      errorMessage = 'Requested resource not found. Check modality configuration.';
     } else if (error.message) {
-      errorMessage = `分析失败: ${error.message}`;
+      errorMessage = `Analysis failed: ${error.message}`;
     }
 
     this.showError(errorMessage);
 
     // 提供重试选项
-    if (confirm(`${errorMessage}\n\n是否重试？`)) {
+    if (confirm(`${errorMessage}\n\nRetry?`)) {
       this.launchAnalysis();
     }
   }
@@ -643,7 +672,7 @@ class ModalitySelector {
         // 更新文本显示当前处理状态
         const spinnerText = reportSpinner.querySelector('.spinText');
         if (spinnerText) {
-          spinnerText.textContent = '正在生成临床报告...';
+          spinnerText.textContent = 'Generating clinical report...';
         }
         reportSpinner.style.display = 'flex';
       } else {
@@ -720,7 +749,7 @@ class ModalitySelector {
     if (progressContainer) {
       progressContainer.style.display = 'block';
     }
-    this.updateProgress(0, '准备中...');
+    this.updateProgress(0, 'Preparing...');
   }
 
   hideProgress() {
@@ -752,9 +781,9 @@ class ModalitySelector {
 
       // 三阶段动画：明文 → 加密中 → 密文
       const stages = [
-        { text: '📊 原始数据', class: 'plaintext' },
-        { text: '🔒 加密中...', class: 'encrypting' },
-        { text: '🔐 已加密', class: 'ciphertext' }
+        { text: '📊 Plaintext data', class: 'plaintext' },
+        { text: '🔒 Encrypting...', class: 'encrypting' },
+        { text: '🔐 Encrypted', class: 'ciphertext' }
       ];
 
       let currentStage = 0;
@@ -798,18 +827,16 @@ class ModalitySelector {
       console.log(`✅ Step 3 status updated: ${tProtect.textContent}`);
     }
 
-    if (typeof renderPrivacyProtection === 'function') {
-      renderPrivacyProtection(privacy);
-      console.log('✅ Rendered privacy protection stage');
-    }
+    // Privacy animation is rendered during /api/privacy_shuffle. Re-rendering here
+    // restarts the sequence and makes the stage appear to play twice.
 
     // 更新Step 4状态为完成
     const tDecrypt = document.getElementById('tDecrypt');
     if (tDecrypt && data.step3) {
       const timeSec = data.step3.time_sec || 0;
       tDecrypt.className = 'pill success';
-      tDecrypt.textContent = `Done (${timeSec.toFixed(1)}s)`;
-      console.log(`✅ Step 4 status updated: Done (${timeSec.toFixed(1)}s)`);
+      tDecrypt.textContent = `Done (${this.formatSeconds(timeSec, 1)})`;
+      console.log(`✅ Step 4 status updated: Done (${this.formatSeconds(timeSec, 1)})`);
     }
 
     // Step 1: 渲染模态数据
@@ -826,8 +853,8 @@ class ModalitySelector {
       const tUpload = document.getElementById('tUpload');
       if (tUpload && data.step1 && data.step1.time_sec !== undefined) {
         tUpload.className = 'pill success';
-        tUpload.textContent = `Done (${data.step1.time_sec.toFixed(2)}s)`;
-        console.log(`✅ Step 1 status updated: Done (${data.step1.time_sec.toFixed(2)}s)`);
+        tUpload.textContent = `Done (${this.formatSeconds(data.step1.time_sec, 2)})`;
+        console.log(`✅ Step 1 status updated: Done (${this.formatSeconds(data.step1.time_sec, 2)})`);
       }
     }
 
@@ -840,8 +867,8 @@ class ModalitySelector {
       const tDispatch = document.getElementById('tDispatch');
       if (tDispatch && s2.time_sec !== undefined) {
         tDispatch.className = 'pill success';
-        tDispatch.textContent = `Done (${s2.time_sec.toFixed(1)}s)`;
-        console.log(`✅ Step 2 status updated: Done (${s2.time_sec.toFixed(1)}s)`);
+        tDispatch.textContent = `Done (${this.formatSeconds(s2.time_sec, 1)})`;
+        console.log(`✅ Step 2 status updated: Done (${this.formatSeconds(s2.time_sec, 1)})`);
       }
 
       // 更新密文预览
@@ -858,6 +885,11 @@ class ModalitySelector {
       renderResults(s3.results || []);
       console.log('✅ Rendered results');
 
+      // 无论后续报告渲染是否完整，进入第四步并停止生成态提示。
+      if (typeof setWorkflowStep === 'function') {
+        setWorkflowStep('report');
+      }
+
       // 动态更新结果标题
       const resultsTitle = document.getElementById('resultsTitle');
       if (resultsTitle) {
@@ -873,9 +905,19 @@ class ModalitySelector {
 
       // 渲染报告
       if (typeof renderHealthReport === 'function' && s3.report) {
-        renderHealthReport(s3.report);
-        if (typeof setWorkflowStep === 'function') {
-          setWorkflowStep('report');
+        try {
+          renderHealthReport(s3.report, s3.plaintext_prompt || s3.llm_prompt);
+        } catch (renderError) {
+          console.error('报告渲染失败:', renderError);
+          const conclusionPanel = document.getElementById('conclusionPanel');
+          const reportText = document.getElementById('reportText');
+          if (conclusionPanel) {
+            conclusionPanel.style.display = 'block';
+            conclusionPanel.innerHTML = `<div class="reportText">${this.safeText(
+              s3.report_conclusion || s3.conclusion || 'Report rendering failed. Please check the raw conclusion.'
+            )}</div>`;
+          }
+          if (reportText) reportText.style.display = 'none';
         }
 
         const conclusionPanel = document.getElementById('conclusionPanel');
@@ -884,6 +926,35 @@ class ModalitySelector {
 
         if (conclusionPanel) conclusionPanel.style.display = 'block';
         if (recommendPanel) recommendPanel.style.display = 'block';
+        if (reportText) reportText.style.display = 'none';
+      } else {
+        const conclusionPanel = document.getElementById('conclusionPanel');
+        const recommendPanel = document.getElementById('recommendPanel');
+        const reportText = document.getElementById('reportText');
+        const conclusion = this.safeText(s3.report_conclusion || s3.conclusion || 'Protected report returned without structured fields yet.');
+
+        if (conclusionPanel) {
+          conclusionPanel.style.display = 'block';
+          conclusionPanel.innerHTML = `<div class="reportText">${conclusion}</div>`;
+        }
+        if (recommendPanel) {
+          recommendPanel.style.display = 'block';
+          recommendPanel.textContent = '—';
+        }
+        if (reportText) {
+          reportText.style.display = 'none';
+        }
+      }
+
+      // 如果报告内容仍未写入，补充兜底提示，避免用户误以为任务未结束。
+      const conclusionPanel = document.getElementById('conclusionPanel');
+      const reportText = document.getElementById('reportText');
+      if (conclusionPanel && !conclusionPanel.innerHTML.trim()) {
+        const fallbackConclusion = this.safeText(
+          s3.report_conclusion || s3.conclusion || 'Protected report returned, but structured content is not rendered yet.'
+        );
+        conclusionPanel.style.display = 'block';
+        conclusionPanel.innerHTML = `<div class="reportText">${fallbackConclusion}</div>`;
         if (reportText) reportText.style.display = 'none';
       }
     }

@@ -4,15 +4,15 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Secure Multimodal HE + LLM Demo</title>
-  <link rel="stylesheet" href="./assets/css/styles.css?v=8"/>
+  <link rel="stylesheet" href="./assets/css/styles.css?v=34"/>
   <link rel="stylesheet" href="./assets/css/enhancement.css?v=15"/>
 </head>
 <body>
   <main class="dashboard-shell">
     <header class="workflow-header">
       <div class="workflow-title">
-        <h1>Privacy-Preserving Health AI</h1>
-        <p>Homomorphic encrypted multimodal inference dashboard</p>
+        <h1>MyGPTShield</h1>
+        <p>Encoding-decoding multimodal inference dashboard</p>
       </div>
       <ol class="stepper" aria-label="Workflow steps">
         <li class="step active" data-step="select"><span>1</span>Select Modalities</li>
@@ -48,16 +48,16 @@
             <!-- Thumbnails will be dynamically generated -->
           </div>
         </div>
-        <div class="spinnerOverlay" id="spinUpload">
-          <div class="spinner"></div><div class="spinText">处理中...</div>
+          <div class="spinnerOverlay" id="spinUpload">
+          <div class="spinner"></div><div class="spinText">Processing...</div>
         </div>
-      </aside>
+        </aside>
 
       <section class="panel-stack">
         <section class="panel panel-models workflow-panel" id="stepDispatch">
           <div class="panel-head">
             <div>
-              <h2>Homomorphic Prediction Model Cluster</h2>
+              <h2>Prediction Model Cluster</h2>
               <p>Selected modalities are dispatched to specialized encrypted inference tools.</p>
             </div>
             <span class="pill" id="tDispatch">—</span>
@@ -97,30 +97,29 @@
           <div class="panel-head">
             <div>
               <h2>Shuffle Privacy Protection</h2>
-              <p>Synthetic candidate shuffling protects the final report output.</p>
             </div>
             <span class="pill" id="tProtect">—</span>
           </div>
           <div class="panel-body">
-            <div class="privacyPanel" id="privacyPanel">Select modalities and run analysis to generate protected candidates.</div>
+            <div class="privacyPanel" id="privacyPanel">Select modalities and run analysis to generate the anonymized privacy flow.</div>
           </div>
         </section>
       </section>
 
       <section class="panel panel-report workflow-panel" id="stepDecrypt">
-        <div class="panel-head">
-          <div>
-            <h2>Protected Health Report</h2>
-            <p>Privacy-preserved clinical summary with status and recommendations.</p>
+          <div class="panel-head">
+            <div>
+              <h2>Protected Health Report</h2>
+              <p>Privacy-preserved clinical summary with status and recommendations.</p>
+            </div>
+            <span class="pill" id="tDecrypt">—</span>
           </div>
-          <span class="pill" id="tDecrypt">—</span>
-        </div>
         <div class="panel-body report-body">
           <div class="progress-container" id="progressContainer" style="display:none;">
             <div class="progress-bar">
               <div class="progress-fill" id="progressFill" style="width: 0%"></div>
             </div>
-            <div class="progress-text" id="progressText">准备中...</div>
+            <div class="progress-text" id="progressText">Preparing...</div>
           </div>
 
           <section class="report-section">
@@ -155,8 +154,8 @@
     </section>
   </main>
 
-  <script src="./assets/js/modalityCards.js?v=18"></script>
-  <script src="./assets/js/modality-selector.js?v=31"></script>
-  <script src="./assets/js/app.js?v=30"></script>
+  <script src="./assets/js/modalityCards.js?v=19"></script>
+  <script src="./assets/js/modality-selector.js?v=34"></script>
+  <script src="./assets/js/app.js?v=43"></script>
 </body>
 </html>

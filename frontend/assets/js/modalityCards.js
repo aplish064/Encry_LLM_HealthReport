@@ -243,7 +243,7 @@ function drawTimeSeriesCard(canvasId, data, config) {
   ctx.font = '9px sans-serif';
   ctx.fillStyle = '#666';
   ctx.textAlign = 'center';
-  ctx.fillText('采样点索引 →', padding.left + chartWidth / 2, displayHeight - 8);
+  ctx.fillText('Sample index ->', padding.left + chartWidth / 2, displayHeight - 8);
 
   return null;
 }
@@ -457,7 +457,6 @@ function createModalityCard(modalityKey, modalityData) {
     <div class="modality-card" id="${cardId}" data-modality="${modalityKey}">
       <div class="card-title">${config.name}</div>
       ${visualContent}
-      <div class="card-desc">${config.description}</div>
     </div>
   `;
 }

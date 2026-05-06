@@ -47,18 +47,18 @@ class EncryptionAnimator {
         const stageHtml = `
             <div class="encryption-stage" id="keygenStage">
                 <div class="stage-icon">🔑</div>
-                <div class="stage-title">生成CKKS加密密钥...</div>
+                <div class="stage-title">Generating CKKS keys...</div>
                 <div class="stage-details">
                     <div class="detail-item">
-                        <span class="detail-label">多项式阶数:</span>
+                        <span class="detail-label">Polynomial degree:</span>
                         <span class="detail-value">16384</span>
                     </div>
                     <div class="detail-item">
-                        <span class="detail-label">系数模数位长:</span>
+                        <span class="detail-label">Coeff mod bit sizes:</span>
                         <span class="detail-value">[60, 40, 40, 40, 40, 40, 60]</span>
                     </div>
                     <div class="detail-item">
-                        <span class="detail-label">全局缩放:</span>
+                        <span class="detail-label">Global scale:</span>
                         <span class="detail-value">2^40</span>
                     </div>
                 </div>
@@ -87,21 +87,21 @@ class EncryptionAnimator {
         const stageHtml = `
             <div class="encryption-stage" id="encryptStage">
                 <div class="stage-icon">🔒</div>
-                <div class="stage-title">加密数据中...</div>
+                <div class="stage-title">Encrypting data...</div>
                 <div class="data-transformation">
                     <div class="data-block plaintext-block">
-                        <div class="block-title">明文数据</div>
+                        <div class="block-title">Plaintext data</div>
                         <div class="block-content" id="plaintextContent">${sampleData.plaintext}</div>
                     </div>
                     <div class="transformation-arrow">
                         <div class="arrow-content">
                             <div class="arrow-icon">↓</div>
-                            <div class="arrow-text">CKKS加密</div>
+                            <div class="arrow-text">CKKS encryption</div>
                         </div>
                     </div>
                     <div class="data-block ciphertext-block">
-                        <div class="block-title">密文数据</div>
-                        <div class="block-content" id="ciphertextContent">~ 加密中 ~</div>
+                        <div class="block-title">Ciphertext data</div>
+                        <div class="block-content" id="ciphertextContent">~ Encrypting ~</div>
                     </div>
                 </div>
                 <div class="progress-bar">
@@ -117,10 +117,10 @@ class EncryptionAnimator {
         const progressBar = document.getElementById('encryptProgress');
 
         const encryptionSteps = [
-            { progress: 30, text: '~ 初始化加密上下文 ~' },
-            { progress: 40, text: '~ 编码明文向量 ~' },
-            { progress: 50, text: '~ 生成密文多项式 ~' },
-            { progress: 60, text: '~ 应用同态运算 ~' }
+            { progress: 30, text: '~ Initializing encryption context ~' },
+            { progress: 40, text: '~ Encoding plaintext vectors ~' },
+            { progress: 50, text: '~ Generating ciphertext polynomials ~' },
+            { progress: 60, text: '~ Applying homomorphic operations ~' }
         ];
 
         for (const step of encryptionSteps) {
@@ -143,19 +143,19 @@ class EncryptionAnimator {
         const stageHtml = `
             <div class="encryption-stage" id="transmitStage">
                 <div class="stage-icon">📡</div>
-                <div class="stage-title">传输加密数据到服务器...</div>
+                <div class="stage-title">Sending encrypted data to server...</div>
                 <div class="transmission-animation">
                     <div class="data-packet" id="dataPacket">📦</div>
                     <div class="server-icon">🖥️</div>
                 </div>
                 <div class="transmission-details">
                     <div class="detail-item">
-                        <span class="detail-label">传输协议:</span>
+                        <span class="detail-label">Transport protocol:</span>
                         <span class="detail-value">HTTPS + TLS 1.3</span>
                     </div>
                     <div class="detail-item">
-                        <span class="detail-label">数据状态:</span>
-                        <span class="detail-value security-badge">🔐 端到端加密</span>
+                        <span class="detail-label">Data state:</span>
+                        <span class="detail-value security-badge">🔐 End-to-end encrypted</span>
                     </div>
                 </div>
                 <div class="progress-bar">
@@ -188,19 +188,19 @@ class EncryptionAnimator {
         const stageHtml = `
             <div class="encryption-stage" id="confirmStage">
                 <div class="stage-icon success-icon">✅</div>
-                <div class="stage-title">数据已安全加密并传输</div>
+                <div class="stage-title">Data encrypted and transferred securely</div>
                 <div class="confirmation-details">
                     <div class="detail-item success-item">
                         <span class="detail-icon">🔒</span>
-                        <span class="detail-text">所有敏感数据已加密</span>
+                        <span class="detail-text">Sensitive data is encrypted</span>
                     </div>
                     <div class="detail-item success-item">
                         <span class="detail-icon">🛡️</span>
-                        <span class="detail-text">服务器仅收到加密密文</span>
+                        <span class="detail-text">Server receives ciphertext only</span>
                     </div>
                     <div class="detail-item success-item">
                         <span class="detail-icon">🔐</span>
-                        <span class="detail-text">推理结果将在本地解密</span>
+                        <span class="detail-text">Inference output is decrypted locally</span>
                     </div>
                 </div>
                 <div class="progress-bar">

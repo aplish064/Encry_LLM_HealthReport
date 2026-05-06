@@ -876,6 +876,31 @@ select {
   gap: 10px;
 }
 
+.reportProtectionBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(31, 157, 85, 0.24);
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.reportProtectionBanner span {
+  display: inline-flex;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 10px;
+  font-weight: 950;
+}
+
 .reportTitle{
   font-size: 14px;
   font-weight: 950;
@@ -1231,6 +1256,21 @@ body {
   background: linear-gradient(180deg, #eff6ff, #ffffff);
 }
 
+.panel-report.active-panel {
+  border-color: rgba(31, 157, 85, 0.65);
+  box-shadow: 0 0 0 3px rgba(31, 157, 85, 0.12), var(--shadow-soft);
+}
+
+.panel-report.active-panel .panel-head {
+  background: linear-gradient(180deg, #ecfdf5, #ffffff);
+}
+
+.panel-report.active-panel .pill {
+  border-color: rgba(31, 157, 85, 0.28);
+  background: #f0fdf4;
+  color: #15803d;
+}
+
 .panel-head {
   display: flex;
   align-items: flex-start;
@@ -1312,6 +1352,58 @@ body {
   max-height: calc(100vh - 112px);
 }
 
+/* Dashboard composition: keep privacy protection large enough to explain the
+   shuffle method instead of sharing a short stacked column with the model stage. */
+.dashboard-grid {
+  grid-template-columns: minmax(280px, 0.82fr) minmax(460px, 1.34fr) minmax(380px, 1.04fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  height: calc(100vh - 112px);
+  min-height: 0;
+  max-height: calc(100vh - 112px);
+}
+
+.panel-stack {
+  display: contents;
+}
+
+.dashboard-grid #stepUpload {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dashboard-grid #stepDispatch {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dashboard-grid #stepProtect {
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+
+.dashboard-grid #stepDecrypt {
+  grid-column: 3;
+  grid-row: 1 / 3;
+}
+
+.panel-modalities,
+.panel-models,
+.panel-privacy,
+.panel-report {
+  max-height: none;
+}
+
+#stepUpload .panel-body,
+#stepDispatch .panel-body {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .panel-modalities .panel-body {
   padding: 0;
   display: flex;
@@ -1322,19 +1414,19 @@ body {
   flex: 1 1 auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: minmax(136px, auto);
-  gap: 10px;
+  grid-auto-rows: minmax(86px, auto);
+  gap: 8px;
   min-height: 0;
   margin: 0;
-  padding: 16px;
+  padding: 10px;
   overflow: auto;
 }
 
 .modality-card {
   position: relative;
   min-width: 0;
-  min-height: 136px;
-  padding: 10px;
+  min-height: 86px;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -1374,7 +1466,7 @@ body {
   min-height: auto;
   margin: 0 0 6px;
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.25;
   font-weight: 850;
 }
@@ -1383,13 +1475,13 @@ body {
   min-height: 0;
   margin: 6px 0 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.35;
 }
 
 .card-visual {
   flex: 0 0 auto;
-  min-height: 72px;
+  min-height: 44px;
   margin: 4px 0;
 }
 
@@ -1399,8 +1491,8 @@ body {
 .canvas-placeholder,
 .card-loading {
   width: 100%;
-  height: 72px;
-  max-height: 72px;
+  height: 44px;
+  max-height: 44px;
   border-radius: 6px;
   background: var(--surface-soft);
   object-fit: contain;
@@ -1447,6 +1539,11 @@ body {
   background: var(--surface-soft);
 }
 
+.reportPromptPanel {
+  border-color: rgba(47, 107, 255, 0.25);
+  background: #f8faff;
+}
+
 .cipher-panel summary {
   cursor: pointer;
   padding: 10px 12px;
@@ -1463,12 +1560,87 @@ body {
   white-space: pre-wrap;
 }
 
+.reportPromptPanel .v {
+  max-height: 180px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .privacyPanel {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   margin-top: 0;
   color: var(--muted);
   font-size: 13px;
+  min-height: 100%;
+  --privacy-stage-raw: 2200ms;
+  --privacy-stage-pool: 2200ms;
+  --privacy-stage-shuffle: 4200ms;
+  --privacy-stage-protected: 2200ms;
+  --privacy-gap-small: 300ms;
+  --privacy-stage-pool-delay: calc(var(--privacy-stage-raw) + var(--privacy-gap-small));
+  --privacy-stage-shuffle-delay: calc(var(--privacy-stage-pool-delay) + var(--privacy-stage-pool) + var(--privacy-gap-small));
+  --privacy-stage-protected-delay: calc(var(--privacy-stage-shuffle-delay) + var(--privacy-stage-shuffle) + var(--privacy-gap-small));
+  --privacy-total-duration: calc(var(--privacy-stage-protected-delay) + var(--privacy-stage-protected));
+}
+
+@keyframes stepReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.privacyPanel.step-by-step .mixerColumn,
+.privacyPanel.step-by-step .mixerArrow {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: stepReveal 420ms ease forwards;
+}
+
+.privacyPanel.step-by-step .mixerRaw { animation-delay: 0ms; }
+.privacyPanel.step-by-step .arrowToPool { animation-delay: 260ms; }
+.privacyPanel.step-by-step .mixerPool { animation-delay: 520ms; }
+.privacyPanel.step-by-step .arrowToShuffle { animation-delay: 780ms; }
+.privacyPanel.step-by-step .mixerShuffle { animation-delay: 1040ms; }
+.privacyPanel.step-by-step .arrowToOutput { animation-delay: 1300ms; }
+.privacyPanel.step-by-step .mixerProtected { animation-delay: 1560ms; }
+
+.privacyPanel .privacyStageOverlay {
+  display: none !important;
+}
+
+.privacyRuntimeBadge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 9px;
+  border: 1px solid rgba(31, 157, 85, 0.24);
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.privacyPanel.is-playing .privacyRuntimeBadge {
+  opacity: 0;
+  animation: tokenReveal 320ms ease forwards;
+}
+
+.panel-privacy .panel-body {
+  display: flex;
+  overflow: auto;
+}
+
+.panel-privacy .privacyPanel {
+  flex: 1 1 auto;
 }
 
 .privacyCandidateGrid {
@@ -1478,21 +1650,96 @@ body {
 }
 
 .privacyMixer {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    "raw pool"
+    "shuffle protected";
   align-items: stretch;
-  gap: 8px;
-  padding: 14px;
+  gap: 10px;
+  padding: 12px;
+  min-height: 248px;
+  height: auto;
+  max-height: none;
+  overflow: visible;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: linear-gradient(180deg, #ffffff, #f8fbff);
 }
 
+.privacyPanel.is-playing .privacyMixer {
+  min-height: 100%;
+  overflow: hidden;
+  border-color: transparent;
+  background: transparent;
+}
+
 .mixerColumn {
+  position: relative;
   min-width: 0;
   display: grid;
-  gap: 6px;
-  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-content: stretch;
+  padding: 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+}
+
+.mixerRaw { grid-area: raw; }
+.mixerPool { grid-area: pool; }
+.mixerShuffle { grid-area: shuffle; }
+.mixerProtected { grid-area: protected; }
+
+.privacyPanel.is-playing .mixerColumn {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  padding: 18px;
+  align-content: center;
+  grid-template-rows: auto minmax(110px, auto) auto;
+  border-color: rgba(37, 99, 235, 0.28);
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
+  pointer-events: none;
+}
+
+.privacyPanel.is-playing .mixerRaw {
+  animation: privacyStageSpotlight var(--privacy-stage-raw) ease-in-out 1;
+}
+
+.privacyPanel.is-playing .mixerPool {
+  animation: privacyStageSpotlight var(--privacy-stage-pool) ease-in-out 1;
+  animation-delay: var(--privacy-stage-pool-delay);
+}
+
+.privacyPanel.is-playing .mixerShuffle {
+  animation: privacyStageSpotlight var(--privacy-stage-shuffle) ease-in-out 1;
+  animation-delay: var(--privacy-stage-shuffle-delay);
+}
+
+.privacyPanel.is-playing .mixerProtected {
+  animation: privacyStageSpotlight var(--privacy-stage-protected) ease-in-out 1;
+  animation-delay: var(--privacy-stage-protected-delay);
+}
+
+.privacyPanel.is-playing .mixerColumn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: privacyStageFrame var(--privacy-total-duration) ease-out 1;
+}
+
+.privacyPanel.is-playing .mixerRaw::before,
+.privacyPanel.is-playing .mixerPool::before,
+.privacyPanel.is-playing .mixerShuffle::before,
+.privacyPanel.is-playing .mixerProtected::before {
+  animation-delay: 0ms;
 }
 
 .mixerLabel {
@@ -1501,20 +1748,9 @@ body {
   font-weight: 900;
 }
 
-.mixerPool,
-.mixerShuffle,
-.mixerProtected {
-  opacity: 0;
-  animation: tokenReveal 500ms ease forwards;
-}
-
-.mixerPool { animation-delay: 700ms; }
-.mixerShuffle { animation-delay: 2400ms; }
-.mixerProtected { animation-delay: 5200ms; }
-
 .rawResultCard,
 .protectedOutputCard {
-  min-height: 58px;
+  min-height: 74px;
   padding: 9px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -1523,38 +1759,126 @@ body {
   line-height: 1.35;
 }
 
+.privacyPanel.is-playing .rawResultCard,
+.privacyPanel.is-playing .protectedOutputCard {
+  min-height: 0;
+}
+
+.privacyPanel.is-playing .mixerLabel {
+  font-size: 13px;
+}
+
+.privacyPanel.is-playing .rawResultCard,
+.privacyPanel.is-playing .protectedOutputCard,
+.privacyPanel.is-playing .candidateReportGrid,
+.privacyPanel.is-playing .syntheticDatabaseStack,
+.privacyPanel.is-playing .mixerTokenGrid,
+.privacyPanel.is-playing .shuffleMethodStage,
+.privacyPanel.is-playing .shuffleChamber {
+  min-height: 224px;
+}
+
+.mixerColumn > :nth-child(2) {
+  min-height: 0;
+}
+
+.mixerRaw .rawResultCard,
+.mixerProtected .protectedOutputCard,
+.mixerPool .candidateReportGrid,
+.mixerPool .syntheticDatabaseStack,
+.mixerPool .mixerTokenGrid,
+.mixerShuffle .shuffleMethodStage {
+  height: 100%;
+}
+
 .rawResultCard strong,
 .rawResultCard span {
   display: block;
 }
 
 .rawResultCard span {
-  margin-top: 5px;
+  margin: 0;
   color: var(--muted);
 }
 
-.protectedOutputCard {
+.rawProfileMetaRow {
   display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rawProfileMetaRow span {
+  line-height: 1.2;
+}
+
+.rawProfileCard {
+  display: grid;
+  gap: 7px;
+}
+
+.rawProfileBars {
+  display: grid;
+  gap: 5px;
+}
+
+.rawProfileBars span {
+  display: block;
+  width: var(--w);
+  height: 7px;
+  border-radius: 999px;
+  background: #d8e1ef;
+}
+
+.privacyPanel.is-playing .rawProfileBars span {
+  animation: rawProfileGlow 1200ms ease-out 1;
+}
+
+.profileLockChip {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-color: rgba(37, 99, 235, 0.45);
-  background: var(--primary-soft);
-  color: var(--primary);
+  align-self: baseline;
+  width: fit-content;
+  padding: 3px 8px;
+  line-height: 1.1;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 10px;
   font-weight: 900;
-  animation: protectedPulse 1300ms ease-in-out infinite;
 }
 
 .mixerArrow {
-  display: flex;
-  align-items: center;
-  color: var(--muted);
-  font-weight: 900;
+  display: none;
 }
+
+.privacyPanel.is-playing .mixerArrow {
+  opacity: 0;
+}
+
+.privacyPanel.is-playing .mixerArrow::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 15px);
+  width: 24px;
+  height: 2px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+  background: #cbd5e1;
+  animation: privacyArrowPulse var(--privacy-total-duration) ease-out 1;
+}
+
+.privacyPanel.is-playing .arrowToPool::after { animation-delay: 900ms; }
+.privacyPanel.is-playing .arrowToShuffle::after { animation-delay: calc(var(--privacy-stage-pool-delay) + 900ms); }
+.privacyPanel.is-playing .arrowToOutput::after { animation-delay: calc(var(--privacy-stage-shuffle-delay) + 1400ms); }
 
 .mixerTokenGrid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
+  align-content: center;
 }
 
 .mixerToken {
@@ -1567,18 +1891,940 @@ body {
   color: #1d4ed8;
   font-size: 10px;
   font-weight: 900;
+}
+
+.privacyPanel.is-playing .mixerToken {
   opacity: 0;
-  animation: tokenReveal 460ms ease forwards, tokenShuffle 2200ms ease-in-out infinite;
-  animation-delay: var(--delay), calc(2500ms + var(--delay));
+  animation: tokenReveal 460ms ease forwards;
+  animation-delay: calc(1200ms + var(--i) * 90ms);
+}
+
+.candidateReportGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-content: stretch;
+}
+
+.syntheticDatabaseStack {
+  min-width: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+}
+
+.syntheticGeneratorStage {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.syntheticGeneratorStage span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.anonymousDatabaseGrid {
+  min-width: 0;
+}
+
+.anonymousRecordCard {
+  min-width: 0;
+}
+
+.distributionPanel {
+  min-width: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 9px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.distributionHead {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+}
+
+.distributionHead strong,
+.distributionHead span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.distributionHead span {
+  color: #1d4ed8;
+  font-weight: 900;
+}
+
+.distributionBars {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+  align-items: end;
+  min-height: 76px;
+}
+
+.distributionBar {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(0, var(--bar-h)) auto auto;
+  align-items: end;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.distributionBar::before {
+  content: "";
+  display: block;
+  height: var(--bar-h);
+  min-height: 12px;
+  border-radius: 5px 5px 3px 3px;
+  background: var(--bar-color);
+  opacity: 0.86;
+}
+
+.distributionBar span,
+.distributionBar em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: normal;
+}
+
+.distributionScatter {
+  position: relative;
+  min-height: 128px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 9px;
+  background: linear-gradient(90deg, #ecfdf5, #fffbeb 52%, #fef2f2);
+  overflow: hidden;
+}
+
+.distributionDot {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--dot-color);
+  opacity: 0.72;
+  transform: translate(-50%, -50%);
+}
+
+.targetDot {
+  width: 8px;
+  height: 8px;
+  background: #2563eb;
+  opacity: 1;
+  box-shadow: 0 0 0 7px rgba(37, 99, 235, 0.16);
+}
+
+.targetLocator {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  transform: translate(-8%, -150%);
+  max-width: 44%;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 8px;
+  font-weight: 900;
+  opacity: 0.92;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backendTokenStrip {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 6px 8px;
+  border: 1px solid rgba(37, 99, 235, 0.17);
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.backendTokenStrip span {
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.backendTokenStrip code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.candidateReportCard {
+  display: grid;
+  gap: 5px;
+  align-content: space-between;
+  min-height: 84px;
+  padding: 8px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--text);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
+}
+
+.privacyPanel.is-playing .candidateReportCard {
+  opacity: 0;
+  animation: reportCandidateReveal 560ms ease forwards;
+  animation-delay: calc(2200ms + var(--i) * 140ms);
+}
+
+.candidateReportHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  font-size: 10px;
+}
+
+.candidateReportHead strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidateReportHead span {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.candidateRisk {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.candidateDocLines {
+  display: grid;
+  gap: 4px;
+}
+
+.candidateDocLines span {
+  display: block;
+  width: var(--w);
+  height: 5px;
+  border-radius: 999px;
+  background: #dbeafe;
+}
+
+.candidateMetricRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.candidateMetricChip {
+  max-width: 100%;
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.privacyPanel:not(.is-playing) .candidateReportCard {
+  min-height: 58px;
+  padding: 7px;
+  gap: 4px;
+}
+
+.privacyPanel:not(.is-playing) .candidateRisk,
+.privacyPanel:not(.is-playing) .candidateMetricRow {
+  display: none;
+}
+
+.privacyPanel:not(.is-playing) .candidateDocLines span {
+  height: 4px;
+}
+
+.privacyPanel.is-playing .syntheticGeneratorStage,
+.privacyPanel.is-playing .anonymousRecordCard {
+  opacity: 0;
+  animation: reportCandidateReveal 560ms ease forwards;
+}
+
+.privacyPanel.is-playing .syntheticGeneratorStage {
+  animation-delay: 2100ms;
+}
+
+.shuffleMethodStage {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 7px;
+  padding: 4px 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  min-height: 0;
+}
+
+.privacyPanel:not(.is-playing) .linkageTrack,
+.privacyPanel:not(.is-playing) .maskOverlay {
+  display: none;
+}
+
+.privacyPanel:not(.is-playing) .shuffleMethodStage {
+  padding: 4px 0;
+  gap: 8px;
+}
+
+.privacyPanel:not(.is-playing) .shuffleProcess {
+  gap: 8px;
+}
+
+.privacyPanel:not(.is-playing) .shuffleProcess > .shuffleProcessStep:first-child {
+  display: grid;
+}
+
+.privacyPanel:not(.is-playing) .shuffleProcess > .processArrow {
+  display: none;
+}
+
+.privacyPanel:not(.is-playing) .shuffleOrder {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 7px;
+}
+
+.privacyPanel:not(.is-playing) .orderChip,
+.privacyPanel:not(.is-playing) .miniCandidateCard {
+  min-height: 22px;
+  font-size: 9px;
+}
+
+.privacyPanel:not(.is-playing) .selectedCandidateCard {
+  min-height: 44px;
+  padding: 7px;
+}
+
+.privacyPanel:not(.is-playing) .maskChipRow {
+  gap: 4px;
+}
+
+.privacyPanel:not(.is-playing) .maskChip {
+  padding: 3px 6px;
+  font-size: 9px;
+}
+
+.linkageTrack {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.linkageNode {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 50px;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.linkageBeam {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.55), rgba(37, 99, 235, 0.35));
+}
+
+.privacyPanel.is-playing .linkageBeam {
+  animation: linkageBreak 2200ms ease forwards;
+  animation-delay: 5200ms;
+}
+
+.shuffleProcess {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  align-content: center;
+}
+
+.shuffleProcessStep {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.processLabel {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.miniCandidateDeck,
+.shuffleOrder {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.miniCandidateCard,
+.orderChip {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 6px;
+  border-radius: 7px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  background: #ffffff;
+  color: #1d4ed8;
+  font-size: 9px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.miniCandidateCard {
+  flex-direction: column;
+  gap: 1px;
+}
+
+.candidateGateTag {
+  color: #64748b;
+  font-size: 8px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.shuffleOrder {
+  padding: 6px;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.07);
+}
+
+.orderChip {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 7px 18px rgba(37, 99, 235, 0.16);
+}
+
+.orderChip {
+  position: relative;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.orderSlot {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 8px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.orderChipSelected {
+  background: #16a34a;
+  border-color: rgba(22, 163, 74, 0.42);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.13), 0 8px 18px rgba(22, 163, 74, 0.16);
+}
+
+.selectionRule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.selectionRule span {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.qualityGate {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid rgba(31, 157, 85, 0.22);
+  border-radius: 8px;
+  background: #f8fffb;
+}
+
+.qualityGateStage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.gateCandidateDeck,
+.gateRejectedLane,
+.gatePassedLane {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  grid-template-rows: auto repeat(2, minmax(44px, 1fr));
+}
+
+.gateCandidateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  min-width: 0;
+}
+
+.gateCandidateCard,
+.rejectedGateCard {
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: center;
+  gap: 1px;
+  padding: 5px 6px;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: 900;
+  overflow: hidden;
+}
+
+.gateCandidateCard span,
+.gateCandidateCard em,
+.rejectedGateCard span,
+.rejectedGateCard em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: normal;
+  line-height: 1.1;
+}
+
+.gateCandidateCard span,
+.rejectedGateCard span,
+.rejectedGateCard em {
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.gateCandidateCard.passed {
+  border: 1px solid rgba(22, 163, 74, 0.30);
+  background: #dcfce7;
+  color: #166534;
+}
+
+.gateCandidateCard.rejected,
+.rejectedGateCard {
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  background: #f1f5f9;
+  color: #64748b;
+  filter: grayscale(1);
+  opacity: 0.66;
+}
+
+.gateCandidateCard.rejected {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.gateDoor {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+  width: clamp(88px, 12vw, 128px);
+  padding: 7px 8px;
+  border-radius: 10px;
+  border: 2px solid rgba(22, 163, 74, 0.40);
+  background: linear-gradient(180deg, #ffffff, #ecfdf5);
+  color: #166534;
+  text-align: center;
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.10);
+}
+
+.gateDoor::before,
+.gateDoor::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.42);
+}
+
+.gateDoor::before { left: 9px; }
+.gateDoor::after { right: 9px; }
+
+.gateDoor span {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #bbf7d0;
+  color: #15803d;
+  font-size: 8px;
+  font-weight: 950;
+}
+
+.gateDoor strong {
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.gateDoor em {
+  color: #64748b;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.gateRejectedLane {
+  align-content: center;
+}
+
+.gatePassedLane {
+  align-content: center;
+}
+
+.qualityGateTitle {
+  grid-column: 1 / -1;
+  color: #166534;
+  font-size: 9px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.qualityGate span {
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 9px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qualityGatePass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 950;
+  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.16);
+}
+
+.selectedCandidateCard {
+  display: grid;
+  gap: 4px;
+  min-height: 52px;
+  align-content: center;
+  padding: 8px;
+  border: 1px solid rgba(31, 157, 85, 0.32);
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.hiddenSelectionCard {
+  min-width: 0;
+}
+
+.bucketedSummaryCard {
+  min-width: 0;
+}
+
+.selectedCandidateCard strong,
+.selectedCandidateCard span,
+.selectedCandidateCard em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectedCandidateCard strong {
+  font-size: 10px;
+}
+
+.selectedCandidateCard span {
+  color: #15803d;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.selectedCandidateCard em {
+  color: #166534;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.processArrow {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.privacyPanel.is-playing .miniCandidateCard {
+  opacity: 0;
+  animation: tokenReveal 380ms ease forwards;
+  animation-delay: calc(4600ms + var(--i) * 95ms);
+}
+
+.privacyPanel.is-playing .qualityGate span {
+  opacity: 0;
+  animation: tokenReveal 360ms ease forwards;
+  animation-delay: calc(5600ms + var(--i) * 140ms);
+}
+
+.privacyPanel.is-playing .qualityGateStage {
+  animation: qualityGateFocus 3600ms ease-out 1;
+  animation-delay: 5200ms;
+}
+
+.privacyPanel.is-playing .qualityGatePass {
+  opacity: 0;
+  animation: tokenReveal 420ms ease forwards;
+  animation-delay: 5520ms;
+}
+
+.privacyPanel.is-playing .gateCandidateCard {
+  opacity: 0;
+  animation: tokenReveal 620ms ease forwards;
+  animation-delay: calc(5600ms + var(--i) * 180ms);
+}
+
+.privacyPanel.is-playing .gateCandidateCard.rejected {
+  animation-name: gateReject;
+}
+
+.privacyPanel.is-playing .gateDoor {
+  animation: gateDoorOpen 2400ms ease-out 1;
+  animation-delay: 5900ms;
+}
+
+.privacyPanel.is-playing .rejectedGateCard {
+  opacity: 0;
+  animation: gateReject 620ms ease forwards;
+  animation-delay: calc(6100ms + var(--i) * 220ms);
+}
+
+.privacyPanel.is-playing .orderChip {
+  opacity: 0;
+  animation: shuffleOrderReveal 760ms ease forwards;
+  animation-delay: calc(7900ms + var(--i) * 320ms);
+}
+
+.privacyPanel.is-playing .selectedCandidateCard {
+  opacity: 0;
+  animation: selectedPickLock 820ms ease forwards;
+  animation-delay: 10100ms;
+}
+
+.privacyPanel.is-playing .processArrow {
+  animation: privacyArrowPulse 1100ms ease-out 1;
+  animation-delay: 7000ms;
+}
+
+.privacyPanel.is-playing .shuffleProcess {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 0.86fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.privacyPanel.is-playing .shuffleProcessStep {
+  min-height: 132px;
+  padding: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.privacyPanel.is-playing .miniCandidateDeck,
+.privacyPanel.is-playing .shuffleOrder {
+  gap: 8px;
+}
+
+.privacyPanel.is-playing .miniCandidateCard,
+.privacyPanel.is-playing .orderChip {
+  min-height: 40px;
+  font-size: 11px;
+}
+
+.privacyPanel.is-playing .selectedCandidateCard {
+  min-height: 96px;
+}
+
+.privacyPanel.is-playing .selectedCandidateCard strong {
+  font-size: 13px;
+}
+
+.privacyPanel.is-playing .selectedCandidateCard span {
+  font-size: 11px;
 }
 
 .shuffleChamber {
   position: relative;
-  min-height: 58px;
+  min-height: 96px;
   overflow: hidden;
   border: 1px dashed rgba(37, 99, 235, 0.35);
   border-radius: var(--radius-md);
   background: rgba(37, 99, 235, 0.06);
+}
+
+.shuffleToken {
+  position: absolute;
+  z-index: 2;
+  width: 28px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.privacyPanel .shuffleChamber .shuffleToken1 { left: 12%; top: 14px; --mix-x: 66px; --mix-y: 30px; }
+.privacyPanel .shuffleChamber .shuffleToken2 { left: 38%; top: 43px; --mix-x: -30px; --mix-y: -28px; }
+.privacyPanel .shuffleChamber .shuffleToken3 { left: 64%; top: 16px; --mix-x: -52px; --mix-y: 32px; }
+.privacyPanel .shuffleChamber .shuffleToken4 { left: 74%; top: 45px; --mix-x: -64px; --mix-y: -20px; }
+
+.privacyPanel.is-playing .shuffleToken {
+  opacity: 0;
+  animation: shuffleTokenMix 2500ms ease-in-out forwards;
+  animation-delay: 2800ms;
+}
+
+.privacyPanel.is-idle .shuffleToken {
+  animation: shuffleTokenIdle 3400ms ease-in-out infinite;
+}
+
+.shuffleReportCard {
+  position: absolute;
+  z-index: 2;
+  width: 104px;
+  min-height: 44px;
+  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+  border: 1px solid rgba(37, 99, 235, 0.24);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 900;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.shuffleReportCard strong {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.privacyPanel .shuffleChamber .shuffleReport1 { left: 7%; top: 12px; --mix-x: 190px; --mix-y: 38px; }
+.privacyPanel .shuffleChamber .shuffleReport2 { left: 34%; top: 58px; --mix-x: -74px; --mix-y: -44px; }
+.privacyPanel .shuffleChamber .shuffleReport3 { left: 55%; top: 18px; --mix-x: -148px; --mix-y: 46px; }
+.privacyPanel .shuffleChamber .shuffleReport4 { left: 73%; top: 62px; --mix-x: -210px; --mix-y: -42px; }
+
+.privacyPanel.is-playing .shuffleReportCard {
+  opacity: 0;
+  animation: shuffleReportMix 2500ms ease-in-out forwards;
+  animation-delay: 2800ms;
+}
+
+.privacyPanel.is-idle .shuffleReportCard {
+  animation: shuffleTokenIdle 3400ms ease-in-out infinite;
 }
 
 .shuffleLine {
@@ -1588,174 +2834,416 @@ body {
   height: 2px;
   border-radius: 999px;
   background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.8), transparent);
-  animation: shuffleSweep 1400ms ease-in-out infinite;
 }
 
-.shuffleLine:nth-child(1) { top: 18px; animation-delay: 2700ms; }
-.shuffleLine:nth-child(2) { top: 30px; animation-delay: 2950ms; }
-.shuffleLine:nth-child(3) { top: 42px; animation-delay: 3200ms; }
-
-.privacyPipeline {
-  display: grid;
-  gap: 8px;
+.privacyPanel.is-playing .shuffleLine {
+  animation: shuffleSweep 1200ms ease-in-out 3;
 }
 
-.privacyStage {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: #ffffff;
+.privacyPanel.is-idle .shuffleLine {
+  animation: shuffleSweep 2600ms ease-in-out infinite;
+}
+
+.shuffleLine:nth-last-of-type(3) { top: 18px; animation-delay: 3100ms; }
+.shuffleLine:nth-last-of-type(2) { top: 34px; animation-delay: 3350ms; }
+.shuffleLine:nth-last-of-type(1) { top: 50px; animation-delay: 3600ms; }
+
+.maskOverlay {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.maskOverlay span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.privacyPanel.is-playing .maskOverlay span {
   opacity: 0;
-  animation: tokenReveal 520ms ease forwards, stageFocus 1200ms ease-in-out;
-  animation-delay: var(--delay);
+  animation: tokenReveal 420ms ease forwards;
+  animation-delay: calc(var(--privacy-stage-shuffle-delay) + 4300ms);
 }
 
-.privacyStage.active {
-  border-color: rgba(37, 99, 235, 0.45);
-  background: var(--primary-soft);
+.maskChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 
-.privacyStageIndex {
+.maskChip {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.privacyPanel.is-playing .maskChip {
+  opacity: 0;
+  animation: tokenReveal 420ms ease forwards;
+  animation-delay: calc(var(--privacy-stage-shuffle-delay) + 4700ms);
+}
+
+.protectedOutputCard {
+  display: grid;
+  align-items: stretch;
+  border-color: rgba(31, 157, 85, 0.35);
+  background: #ecfdf5;
+  color: #15803d;
+  font-weight: 900;
+  overflow: hidden;
+}
+
+.privacyPanel.is-playing .protectedOutputCard {
+  opacity: 0;
+  animation: protectedArrive 760ms ease forwards, protectedPulse 1200ms ease-in-out 1;
+  animation-delay: var(--privacy-stage-protected-delay), calc(var(--privacy-stage-protected-delay) + 700ms);
+}
+
+.protectedOutputBridge {
+  min-width: 0;
+  width: 100%;
+  min-height: 100%;
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  justify-items: start;
+  padding: 12px;
+  border: 1px solid rgba(31, 157, 85, 0.28);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #14532d;
+}
+
+.protectedBridgeLabel {
+  display: inline-flex;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.protectedOutputBridge strong {
+  min-width: 0;
+  color: #14532d;
+  font-size: 13px;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.protectedOutputBridge span {
+  color: #15803d;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.bridgeArrow {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: #eaf0f8;
-  color: var(--muted);
-  font-size: 11px;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 10px;
   font-weight: 900;
 }
 
-.privacyStage.active .privacyStageIndex {
-  background: var(--primary);
-  color: #ffffff;
+.bridgeArrow::before {
+  content: "→";
+  color: #16a34a;
+  font-size: 14px;
+  line-height: 1;
 }
 
-.privacyStageTitle {
-  font-size: 13px;
-  font-weight: 900;
-  color: var(--text);
-  line-height: 1.25;
-}
-
-.privacyStageDetail {
-  margin-top: 3px;
-  font-size: 12px;
-  line-height: 1.35;
-  color: var(--muted);
-}
-
-@keyframes stageFocus {
-  0%, 100% { border-color: var(--border); background: #ffffff; }
-  30%, 75% { border-color: rgba(37, 99, 235, 0.55); background: var(--primary-soft); }
-}
-
-.privacyMetricGrid {
+.protectedReportThumb {
+  width: 100%;
+  min-height: 100%;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.linkageMeter {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid rgba(31, 157, 85, 0.26);
+  border-radius: 8px;
   background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(31, 157, 85, 0.08);
 }
 
-.linkageText {
+.privacyPanel:not(.is-playing) .protectedReportThumb {
+  gap: 6px;
+  padding: 8px;
+}
+
+.privacyPanel:not(.is-playing) .protectedReportBars {
+  gap: 4px;
+}
+
+.privacyPanel:not(.is-playing) .protectedReportBars span {
+  height: 6px;
+}
+
+.privacyPanel:not(.is-playing) .protectedReportMeta span {
+  padding: 3px 6px;
+}
+
+.protectedReportSource {
+  display: grid;
+  gap: 3px;
+  color: #15803d;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.protectedReportSource span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.protectedReportSource span:first-child {
+  color: #14532d;
+  font-size: 10px;
+  font-weight: 950;
+}
+
+.protectedReportHead {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 4px;
-  color: var(--text);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.linkageTrack {
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(239, 68, 68, 0.25), rgba(37, 99, 235, 0.18), rgba(31, 157, 85, 0.20));
-}
-
-.linkageFill {
-  height: 100%;
-  width: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #ef4444, #2563eb);
-  animation: linkageReduce 1600ms ease forwards;
-}
-
-.privacyMetric {
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-soft);
-}
-
-.privacyMetricLabel {
-  color: var(--muted);
+  min-width: 0;
+  color: #14532d;
   font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
 }
 
-.privacyMetricValue {
-  margin-top: 3px;
-  color: var(--text);
-  font-size: 12px;
+.protectedReportHead strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.protectedReportHead span {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 9px;
   font-weight: 900;
 }
 
-.privacyCandidateFoot {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
+.protectedReportBars {
+  display: grid;
+  gap: 6px;
+  align-content: center;
 }
 
-.privacySelectedOutput {
-  padding: 10px;
-  border: 1px solid rgba(31, 157, 85, 0.24);
-  border-radius: var(--radius-md);
-  background: rgba(31, 157, 85, 0.08);
+.protectedReportBars span {
+  display: block;
+  width: var(--w);
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #86efac, #2563eb);
+  opacity: 0.72;
+}
+
+.protectedReportMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.protectedReportMeta span {
+  max-width: 100%;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 9px;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .privacyCandidateCard,
-.privacySummary,
-.recommendPanel,
-.reportPanel,
-.resultTableWrap {
+.privacySummary {
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   box-shadow: none;
 }
 
-.privacyCandidateCard {
-  opacity: 0;
-  animation: tokenReveal 420ms ease forwards;
-  animation-delay: var(--delay);
+@keyframes privacyStageFrame {
+  0%, 12%, 100% { border-color: transparent; }
+  4%, 9% { border-color: rgba(37, 99, 235, 0.65); }
+}
+
+@keyframes privacyStageSpotlight {
+  0%, 100% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  5%, 82% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  92% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+}
+
+@keyframes rawProfileGlow {
+  0% { background: #d8e1ef; }
+  48% { background: #6366f1; }
+  100% { background: #d8e1ef; }
+}
+
+@keyframes privacyArrowPulse {
+  0%, 9%, 100% { background: #cbd5e1; }
+  3%, 6% { background: #2563eb; }
 }
 
 @keyframes tokenReveal {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px) scale(0.94); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes tokenShuffle {
-  0%, 100% { transform: translateX(0); }
-  35% { transform: translateX(calc((var(--slot) - 5) * 1px)); }
-  70% { transform: translateX(calc((5 - var(--slot)) * 1px)); }
+@keyframes tokenIdleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+@keyframes reportCandidateReveal {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes shuffleOrderReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) translateX(calc((var(--i) - 1.5) * 14px)) scale(0.94);
+  }
+  58% {
+    opacity: 1;
+    transform: translateY(3px) translateX(calc((1.5 - var(--i)) * 6px)) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) translateX(0) scale(1);
+  }
+}
+
+@keyframes selectedPickLock {
+  from {
+    opacity: 0;
+    transform: translateX(-12px) scale(0.95);
+    box-shadow: 0 0 0 0 rgba(31, 157, 85, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    box-shadow: 0 0 0 6px rgba(31, 157, 85, 0.08);
+  }
+}
+
+@keyframes shuffleSequenceReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes qualityGateFocus {
+  0%, 100% {
+    border-color: rgba(31, 157, 85, 0.22);
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
+    transform: scale(1);
+  }
+  18%, 72% {
+    border-color: rgba(22, 163, 74, 0.58);
+    box-shadow: 0 0 0 5px rgba(22, 163, 74, 0.10), 0 12px 28px rgba(22, 163, 74, 0.14);
+    transform: scale(1.015);
+  }
+}
+
+@keyframes gateDoorOpen {
+  0%, 100% {
+    border-color: rgba(22, 163, 74, 0.40);
+    box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.10);
+  }
+  35%, 72% {
+    border-color: rgba(22, 163, 74, 0.80);
+    box-shadow: 0 0 0 5px rgba(22, 163, 74, 0.10), inset 0 0 0 1px rgba(22, 163, 74, 0.18);
+  }
+}
+
+@keyframes gateReject {
+  from {
+    opacity: 0;
+    transform: translateX(10px) scale(0.96);
+    filter: grayscale(0);
+  }
+  to {
+    opacity: 0.66;
+    transform: translateX(0) scale(1);
+    filter: grayscale(1);
+  }
+}
+
+@keyframes shuffleTokenMix {
+  0% { opacity: 0; transform: translate(0, 8px) rotate(0deg); }
+  12% { opacity: 1; }
+  45% { transform: translate(var(--mix-x), var(--mix-y)) rotate(30deg); }
+  76% { transform: translate(calc(var(--mix-x) * -0.35), calc(var(--mix-y) * 0.5)) rotate(-20deg); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+}
+
+@keyframes shuffleReportMix {
+  0% { opacity: 0; transform: translate(0, 8px) rotate(0deg) scale(0.96); }
+  12% { opacity: 1; }
+  45% { transform: translate(var(--mix-x), var(--mix-y)) rotate(5deg) scale(1.02); }
+  76% { transform: translate(calc(var(--mix-x) * -0.35), calc(var(--mix-y) * 0.5)) rotate(-4deg) scale(1); }
+  100% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+}
+
+@keyframes linkageBreak {
+  0% {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.65), rgba(37, 99, 235, 0.45));
+  }
+  45% {
+    opacity: 0.85;
+    clip-path: inset(0 42% 0 0);
+  }
+  100% {
+    opacity: 0.35;
+    clip-path: inset(0 72% 0 0);
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.45), rgba(31, 157, 85, 0.35));
+  }
+}
+
+@keyframes shuffleTokenIdle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
 }
 
 @keyframes shuffleSweep {
@@ -1764,14 +3252,795 @@ body {
   to { transform: translateX(230%); opacity: 0.2; }
 }
 
-@keyframes linkageReduce {
-  from { width: 100%; }
-  to { width: 34%; }
+@keyframes protectedArrive {
+  from { opacity: 0; transform: translateX(-8px) scale(0.96); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 @keyframes protectedPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.16); }
-  50% { box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(31, 157, 85, 0.14); }
+  50% { box-shadow: 0 0 0 5px rgba(31, 157, 85, 0.07); }
+}
+
+@media (max-width: 980px) {
+  .privacyMixer {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "raw"
+      "pool"
+      "shuffle"
+      "protected";
+    max-height: none;
+    overflow: visible;
+  }
+
+  .mixerArrow {
+    min-height: 18px;
+    justify-content: center;
+  }
+
+  .privacyPanel.is-playing .mixerArrow::after {
+    top: 50%;
+    transform: translateX(-50%) rotate(90deg);
+  }
+
+.privacyPanel.is-playing .mixerColumn {
+    inset: 0;
+  }
+
+  .privacyPanel.is-playing .shuffleProcess {
+    grid-template-columns: 1fr;
+  }
+
+  .privacyPanel .shuffleChamber .shuffleToken1 { --mix-x: 38px; --mix-y: 24px; }
+  .privacyPanel .shuffleChamber .shuffleToken2 { --mix-x: -24px; --mix-y: -22px; }
+  .privacyPanel .shuffleChamber .shuffleToken3 { --mix-x: -36px; --mix-y: 24px; }
+  .privacyPanel .shuffleChamber .shuffleToken4 { --mix-x: -42px; --mix-y: -18px; }
+  .privacyPanel .shuffleChamber .shuffleReport1 { --mix-x: 72px; --mix-y: 28px; }
+  .privacyPanel .shuffleChamber .shuffleReport2 { --mix-x: -42px; --mix-y: -26px; }
+  .privacyPanel .shuffleChamber .shuffleReport3 { --mix-x: -64px; --mix-y: 28px; }
+  .privacyPanel .shuffleChamber .shuffleReport4 { --mix-x: -82px; --mix-y: -26px; }
+}
+
+.panel-privacy .panel-body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.privacyPanel {
+  min-height: 0;
+}
+
+.privacyMixer {
+  max-height: none;
+  overflow: visible;
+  grid-auto-rows: minmax(108px, auto);
+}
+
+.privacyPanel.is-playing .privacyMixer {
+  height: 100%;
+  min-height: 312px;
+  max-height: none;
+  overflow: hidden;
+}
+
+.privacyPanel.is-playing .mixerColumn {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: stretch;
+  justify-content: stretch;
+  overflow: hidden;
+}
+
+.privacyPanel.is-playing .mixerColumn > :nth-child(2) {
+  align-self: stretch;
+}
+
+.privacyPanel.is-playing .rawResultCard,
+.privacyPanel.is-playing .protectedOutputCard,
+.privacyPanel.is-playing .candidateReportGrid,
+.privacyPanel.is-playing .syntheticDatabaseStack,
+.privacyPanel.is-playing .shuffleMethodStage {
+  height: 100%;
+  min-height: 0;
+}
+
+.privacyPanel.is-playing .rawProfileCard,
+.privacyPanel.is-playing .protectedOutputCard {
+  align-content: center;
+}
+
+.privacyPanel.is-playing .candidateReportGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: center;
+}
+
+.privacyPanel.is-playing .candidateReportCard {
+  min-height: 86px;
+}
+
+.privacyPanel.is-playing .shuffleMethodStage {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: stretch;
+}
+
+.privacyPanel.is-playing .shuffleProcess {
+  grid-template-columns: 1fr;
+  align-content: stretch;
+  gap: 8px;
+}
+
+.privacyPanel.is-playing .shuffleProcessStep {
+  min-height: 0;
+  padding: 8px;
+}
+
+.privacyPanel.is-playing .miniCandidateCard,
+.privacyPanel.is-playing .orderChip {
+  min-height: 28px;
+  font-size: 10px;
+}
+
+.privacyPanel.is-playing .selectedCandidateCard {
+  min-height: 58px;
+}
+
+.privacyStageOverlay {
+  display: none;
+}
+
+.privacyPanel.is-playing .privacyMixer > .mixerColumn,
+.privacyPanel.is-playing .privacyMixer > .mixerArrow {
+  visibility: hidden;
+  animation: none !important;
+}
+
+.privacyPanel.is-playing .privacyMixer > .mixerColumn::before {
+  content: none;
+}
+
+.privacyPanel.is-playing .privacyStageOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: block;
+  border: 1px solid rgba(37, 99, 235, 0.32);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.privacyStageScene {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 18px;
+  opacity: 0;
+  pointer-events: none;
+  align-content: stretch;
+}
+
+.privacyStageScene > :nth-child(2) {
+  min-height: 0;
+  align-self: stretch;
+}
+
+.privacyStageScene .rawResultCard,
+.privacyStageScene .candidateReportGrid,
+.privacyStageScene .syntheticDatabaseStack,
+.privacyStageScene .shuffleMethodStage,
+.privacyStageScene .protectedOutputCard {
+  height: 100%;
+  min-height: 0;
+}
+
+.privacyStageScene .rawProfileCard,
+.privacyStageScene .protectedOutputCard {
+  align-content: center;
+}
+
+.privacyStageScene .candidateReportGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: center;
+}
+
+.privacyStageScene .candidateReportCard {
+  min-height: 88px;
+}
+
+.privacyStageScene .shuffleMethodStage {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.privacyStageScene .shuffleProcess {
+  grid-template-columns: 1fr;
+  align-content: stretch;
+  gap: 8px;
+}
+
+.privacyStageScene .selectionRule {
+  justify-content: center;
+}
+
+.privacyStageScene .shuffleProcessStep {
+  min-height: 0;
+  padding: 8px;
+}
+
+.privacyStageScene .miniCandidateCard,
+.privacyStageScene .orderChip {
+  min-height: 28px;
+  font-size: 10px;
+}
+
+.privacyStageScene .selectedCandidateCard {
+  min-height: 58px;
+}
+
+.privacyPanel.is-playing .sceneRaw {
+  animation: privacyStageSpotlight var(--privacy-stage-raw) ease-in-out 1;
+}
+
+.privacyPanel.is-playing .scenePool {
+  animation: privacyStageSpotlight var(--privacy-stage-pool) ease-in-out 1;
+  animation-delay: var(--privacy-stage-pool-delay);
+}
+
+.privacyPanel.is-playing .sceneShuffle {
+  animation: privacyStageSpotlight var(--privacy-stage-shuffle) ease-in-out 1;
+  animation-delay: var(--privacy-stage-shuffle-delay);
+}
+
+.privacyPanel.is-playing .sceneProtected {
+  animation: privacyStageSpotlight var(--privacy-stage-protected) ease-in-out 1;
+  animation-delay: var(--privacy-stage-protected-delay);
+}
+
+.privacyPanel.is-playing .privacyStageScene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: privacyStageFrame var(--privacy-total-duration) ease-out 1;
+}
+
+.privacyPanel.is-complete .privacyMixer {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  border-color: var(--border);
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.privacyPanel.is-complete .privacyStageOverlay {
+  display: none !important;
+}
+
+.privacyPanel.is-complete .privacyMixer > .mixerColumn,
+.privacyPanel.is-complete .privacyMixer > .mixerArrow {
+  position: relative;
+  visibility: visible !important;
+  opacity: 1 !important;
+  animation: none !important;
+  pointer-events: auto;
+}
+
+.privacyPanel.is-complete .privacyMixer > .mixerColumn::before,
+.privacyPanel.is-complete .privacyMixer > .mixerArrow::after {
+  content: none;
+}
+
+.privacyPanel.is-complete .rawResultCard,
+.privacyPanel.is-complete .protectedOutputCard,
+.privacyPanel.is-complete .candidateReportGrid,
+.privacyPanel.is-complete .syntheticDatabaseStack,
+.privacyPanel.is-complete .syntheticGeneratorStage,
+.privacyPanel.is-complete .shuffleMethodStage,
+.privacyPanel.is-complete .candidateReportCard,
+.privacyPanel.is-complete .anonymousRecordCard,
+.privacyPanel.is-complete .gateCandidateCard,
+.privacyPanel.is-complete .rejectedGateCard,
+.privacyPanel.is-complete .orderChip,
+.privacyPanel.is-complete .selectedCandidateCard,
+.privacyPanel.is-complete .hiddenSelectionCard,
+.privacyPanel.is-complete .maskChip {
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  animation: none !important;
+}
+
+.privacyPanel.is-complete .gateCandidateCard.rejected,
+.privacyPanel.is-complete .rejectedGateCard {
+  opacity: 0.66 !important;
+}
+
+/* Zoom-safe privacy layout: the panel column is narrow in the dashboard, and
+   browser zoom makes the effective width smaller. Keep this block container-led
+   instead of relying on wide fixed tracks. */
+.panel-privacy .panel-body {
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.panel-privacy .privacyPanel {
+  width: 100%;
+  min-width: 0;
+}
+
+.panel-privacy .privacyMixer {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "raw"
+    "pool"
+    "shuffle"
+    "protected";
+  grid-auto-rows: auto;
+  gap: clamp(6px, 1.2vw, 10px);
+  padding: clamp(8px, 1.2vw, 12px);
+  min-height: 0;
+  max-width: 100%;
+  overflow: visible;
+}
+
+.panel-privacy .mixerColumn {
+  gap: 6px;
+  padding: clamp(6px, 1vw, 9px);
+}
+
+.panel-privacy .candidateReportGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel-privacy .candidateReportCard {
+  min-height: 54px;
+}
+
+.panel-privacy .shuffleProcess,
+.panel-privacy .protectedReportThumb {
+  min-width: 0;
+}
+
+.panel-privacy .protectedOutputCard,
+.panel-privacy .shuffleMethodStage,
+.panel-privacy .candidateReportGrid,
+.panel-privacy .syntheticDatabaseStack,
+.panel-privacy .rawResultCard {
+  min-width: 0;
+}
+
+.privacyPanel.is-playing .privacyMixer {
+  height: clamp(420px, 72vh, 640px);
+  min-height: clamp(420px, 72vh, 640px);
+  max-height: none;
+  overflow: hidden;
+}
+
+.privacyPanel.is-playing .privacyStageScene {
+  padding: clamp(10px, 1.7vw, 18px);
+  gap: clamp(7px, 1.1vw, 12px);
+}
+
+.privacyPanel.is-playing .privacyStageScene .candidateReportCard {
+  min-height: clamp(64px, 10vh, 88px);
+}
+
+.privacyPanel.is-playing .privacyStageScene .miniCandidateCard,
+.privacyPanel.is-playing .privacyStageScene .orderChip {
+  min-height: clamp(22px, 4vh, 28px);
+  font-size: clamp(8px, 1.3vw, 10px);
+}
+
+.privacyPanel.is-playing .privacyStageScene .selectionRule {
+  font-size: clamp(10px, 1.6vw, 12px);
+}
+
+.privacyPanel.is-playing .privacyStageScene .selectedCandidateCard {
+  min-height: clamp(46px, 8vh, 58px);
+}
+
+.privacyPanel.is-playing .privacyStageScene .protectedReportThumb {
+  padding: clamp(8px, 1.3vw, 11px);
+}
+
+.privacyPanel.is-playing .sceneShuffle {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.privacyPanel.is-playing .sceneShuffle .shuffleMethodStage {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 7px;
+  height: 100%;
+  overflow: hidden;
+  border-color: transparent;
+  background: transparent;
+}
+
+.privacyPanel.is-playing .sceneShuffle .linkageTrack,
+.privacyPanel.is-playing .sceneShuffle .maskOverlay,
+.privacyPanel.is-playing .sceneShuffle .shuffleProcessStep,
+.privacyPanel.is-playing .sceneShuffle .processArrow,
+.privacyPanel.is-playing .sceneShuffle .maskChipRow {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  animation: shuffleSequenceReveal 420ms ease forwards;
+}
+
+.privacyPanel.is-playing .sceneShuffle .shuffleProcessStep:not(.selectedPick) {
+  animation-delay: 200ms;
+}
+
+.privacyPanel.is-playing .sceneShuffle .processArrow {
+  animation-delay: 1000ms;
+}
+
+.privacyPanel.is-playing .sceneShuffle .selectedPick {
+  animation-delay: 1600ms;
+}
+
+.privacyPanel.is-playing .sceneShuffle .linkageTrack {
+  animation-delay: 2200ms;
+}
+
+.privacyPanel.is-playing .sceneShuffle .maskOverlay {
+  animation-delay: 2700ms;
+}
+
+.privacyPanel.is-playing .sceneShuffle .maskChipRow {
+  animation-delay: 3200ms;
+}
+
+.privacyPanel.is-playing .sceneShuffle .linkageBeam {
+  animation-delay: 2300ms;
+}
+
+.privacyPanel.is-playing .sceneShuffle .maskOverlay span {
+  animation-delay: 2850ms;
+}
+
+.privacyPanel.is-playing .sceneShuffle .maskChip {
+  animation-delay: 3350ms;
+}
+
+.privacyPanel.is-playing .sceneShuffle .shuffleProcess {
+  grid-template-columns: minmax(0, 1.5fr) auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) minmax(58px, auto);
+  align-content: stretch;
+  align-items: stretch;
+  gap: 11px 10px;
+}
+
+.privacyPanel.is-playing .sceneShuffle .shuffleProcessStep {
+  min-height: 0;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.privacyPanel.is-playing .sceneShuffle .shuffleProcess > :nth-child(1) {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.privacyPanel.is-playing .sceneShuffle .shuffleProcess > :nth-child(2) {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+}
+
+.privacyPanel.is-playing .sceneShuffle .shuffleProcess > :nth-child(3) {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.privacyPanel.is-playing .sceneShuffle .shuffleProcess > :nth-child(4) {
+  display: none;
+}
+
+.privacyPanel.is-playing .sceneShuffle .shuffleProcess > :nth-child(5) {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.privacyPanel.is-playing .sceneShuffle .shuffleOrder {
+  gap: 5px;
+  padding: 5px;
+}
+
+.privacyPanel.is-playing .sceneShuffle .selectedCandidateCard {
+  min-height: 58px;
+  grid-template-columns: minmax(0, 1.2fr) auto minmax(0, 2fr);
+  align-items: center;
+  gap: 8px;
+  animation-delay: 1800ms;
+}
+
+.privacyPanel.is-playing .sceneShuffle .selectedCandidateCard strong,
+.privacyPanel.is-playing .sceneShuffle .selectedCandidateCard span,
+.privacyPanel.is-playing .sceneShuffle .selectedCandidateCard em {
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.privacyPanel.is-playing .sceneShuffle .maskChipRow {
+  flex-shrink: 0;
+}
+
+@media (max-width: 1280px), (max-height: 780px) {
+  .panel-privacy .panel-head {
+    padding: 10px 12px;
+  }
+
+  .panel-privacy .panel-body {
+    padding: 10px;
+  }
+
+  .panel-privacy .mixerLabel {
+    font-size: 10px;
+  }
+
+  .panel-privacy .candidateReportHead,
+  .panel-privacy .candidateRisk,
+  .panel-privacy .rawResultCard,
+  .panel-privacy .protectedOutputCard {
+    font-size: 10px;
+  }
+
+  .panel-privacy .candidateMetricChip,
+  .panel-privacy .maskChip,
+  .panel-privacy .protectedReportMeta span {
+    font-size: 8px;
+  }
+}
+
+@media (min-width: 1280px) and (min-height: 720px) {
+  .panel-privacy .privacyMixer {
+    grid-template-columns: minmax(190px, 0.82fr) minmax(0, 1.18fr);
+    grid-template-areas:
+      "raw pool"
+      "shuffle shuffle"
+      "protected protected";
+    grid-template-rows: minmax(145px, auto) minmax(210px, 1fr) minmax(130px, auto);
+    align-content: stretch;
+    min-height: 100%;
+  }
+
+  .panel-privacy .privacyPanel,
+  .panel-privacy .privacyMixer {
+    height: 100%;
+  }
+
+  .panel-privacy .mixerProtected .protectedOutputCard {
+    min-height: 120px;
+  }
+
+  .panel-privacy .mixerProtected .protectedReportThumb {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+}
+
+.privacyPanel:not(.is-playing) .privacyMixer {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-areas:
+    "raw pool"
+    "shuffle shuffle"
+    "protected protected";
+  grid-template-rows: none;
+  grid-auto-rows: auto;
+  align-content: start;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  gap: 7px;
+  padding: 9px;
+}
+
+.privacyPanel:not(.is-playing),
+.privacyPanel:not(.is-playing) .privacyMixer,
+.privacyPanel:not(.is-playing) .mixerColumn,
+.privacyPanel:not(.is-playing) .rawResultCard,
+.privacyPanel:not(.is-playing) .protectedOutputCard,
+.privacyPanel:not(.is-playing) .candidateReportGrid,
+.privacyPanel:not(.is-playing) .syntheticDatabaseStack,
+.privacyPanel:not(.is-playing) .shuffleMethodStage {
+  height: auto;
+}
+
+.panel-privacy .privacyPanel:not(.is-playing) {
+  flex: 0 0 auto;
+  align-self: flex-start;
+}
+
+.privacyPanel:not(.is-playing) .mixerColumn {
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  gap: 5px;
+  padding: 7px;
+}
+
+.privacyPanel:not(.is-playing) .mixerRaw,
+.privacyPanel:not(.is-playing) .mixerPool {
+  align-self: stretch;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+}
+
+.privacyPanel:not(.is-playing) .mixerRaw .rawResultCard {
+  height: auto;
+  min-height: 88px;
+}
+
+.privacyPanel:not(.is-playing) .mixerPool .candidateReportGrid {
+  height: auto;
+  min-height: 88px;
+}
+
+.privacyPanel:not(.is-playing) .mixerPool .syntheticDatabaseStack {
+  height: auto;
+  min-height: 88px;
+}
+
+.privacyPanel:not(.is-playing) .rawResultCard,
+.privacyPanel:not(.is-playing) .protectedOutputCard {
+  min-height: 88px;
+}
+
+.privacyPanel:not(.is-playing) .rawProfileCard {
+  gap: 5px;
+}
+
+.privacyPanel:not(.is-playing) .rawProfileBars {
+  gap: 4px;
+}
+
+.privacyPanel:not(.is-playing) .rawProfileBars span {
+  height: 5px;
+}
+
+.privacyPanel:not(.is-playing) .candidateReportGrid {
+  gap: 4px;
+}
+
+.privacyPanel:not(.is-playing) .candidateReportCard {
+  min-height: 46px;
+}
+
+.privacyPanel:not(.is-playing) .shuffleMethodStage {
+  grid-template-rows: auto;
+  overflow: visible;
+  gap: 6px;
+  padding: 8px;
+}
+
+.privacyPanel:not(.is-playing) .shuffleProcess {
+  align-content: start;
+  gap: 5px;
+}
+
+.privacyPanel:not(.is-playing) .shuffleOrder {
+  gap: 4px;
+  padding: 5px;
+}
+
+.privacyPanel:not(.is-playing) .selectionRule {
+  padding: 5px 7px;
+  font-size: 10px;
+}
+
+.privacyPanel:not(.is-playing) .selectedCandidateCard {
+  min-height: 38px;
+  gap: 2px;
+  padding: 6px;
+}
+
+.privacyPanel:not(.is-playing) .mixerShuffle {
+  border-color: transparent;
+  background: transparent;
+}
+
+.privacyPanel:not(.is-playing) .mixerProtected {
+  border-color: transparent;
+  background: transparent;
+}
+
+.privacyPanel:not(.is-playing) .protectedOutputCard {
+  border-color: transparent;
+  background: transparent;
+  min-height: 68px;
+  padding: 0;
+}
+
+.privacyPanel:not(.is-playing) .protectedOutputBridge {
+  min-height: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  align-content: center;
+  gap: 4px 8px;
+  padding: 7px;
+}
+
+.privacyPanel:not(.is-playing) .protectedBridgeLabel {
+  padding: 3px 7px;
+  font-size: 9px;
+}
+
+.privacyPanel:not(.is-playing) .protectedOutputBridge strong {
+  font-size: 12px;
+}
+
+.privacyPanel:not(.is-playing) .protectedOutputBridge span,
+.privacyPanel:not(.is-playing) .bridgeArrow {
+  font-size: 9px;
+}
+
+.privacyPanel:not(.is-playing) .bridgeArrow {
+  grid-column: 1 / -1;
+  padding: 4px 7px;
+}
+
+.privacyPanel:not(.is-playing) .selectedCandidateCard em {
+  font-size: 8px;
+  line-height: 1.15;
+}
+
+@media (max-width: 980px) {
+  .privacyPanel:not(.is-playing) .privacyMixer {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "raw"
+      "pool"
+      "shuffle"
+      "protected";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .privacyPanel.is-playing .mixerColumn::before,
+  .privacyPanel.is-playing .rawProfileBars span,
+  .privacyPanel.is-playing .mixerArrow::after,
+  .privacyPanel.is-playing .mixerToken,
+  .privacyPanel.is-idle .mixerToken,
+  .privacyPanel.is-playing .candidateReportCard,
+  .privacyPanel.is-idle .candidateReportCard,
+  .privacyPanel.is-playing .miniCandidateCard,
+  .privacyPanel.is-playing .orderChip,
+  .privacyPanel.is-playing .selectedCandidateCard,
+  .privacyPanel.is-playing .processArrow,
+  .privacyPanel.is-playing .shuffleToken,
+  .privacyPanel.is-idle .shuffleToken,
+  .privacyPanel.is-playing .shuffleReportCard,
+  .privacyPanel.is-idle .shuffleReportCard,
+  .privacyPanel.is-playing .linkageBeam,
+  .privacyPanel.is-playing .shuffleLine,
+  .privacyPanel.is-idle .shuffleLine,
+  .privacyPanel.is-playing .maskOverlay span,
+  .privacyPanel.is-playing .maskChip,
+  .privacyPanel.is-playing .protectedOutputCard,
+  .privacyPanel.is-idle .protectedOutputCard {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .privacyPanel.is-playing .mixerColumn {
+    position: relative;
+    inset: auto;
+    opacity: 1 !important;
+    box-shadow: none;
+    pointer-events: auto;
+  }
+
+  .privacyPanel.is-playing .mixerArrow::after {
+    content: none;
+  }
 }
 
 .report-body {
@@ -1820,10 +4089,63 @@ body {
 
   .dashboard-grid {
     grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto;
+    height: auto;
+    max-height: none;
+    min-height: calc(100vh - 112px);
+  }
+
+  .dashboard-grid #stepUpload {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .dashboard-grid #stepDispatch {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .dashboard-grid #stepProtect {
+    grid-column: 2;
+    grid-row: 1 / 3;
   }
 
   .panel-report {
     grid-column: 1 / -1;
+    grid-row: 3;
+    max-height: none;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1180px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(280px, 0.92fr) minmax(360px, 1.08fr);
+    grid-template-rows: auto auto auto;
+    align-items: start;
+  }
+
+  .dashboard-grid #stepUpload {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .dashboard-grid #stepDispatch {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .dashboard-grid #stepDecrypt {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+
+  .dashboard-grid #stepProtect {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  .panel-privacy,
+  .panel-report {
     max-height: none;
   }
 }
@@ -1861,6 +4183,16 @@ body {
   .panel-stack {
     grid-template-columns: 1fr;
     grid-template-rows: none;
+    height: auto;
+    max-height: none;
+  }
+
+  .dashboard-grid #stepUpload,
+  .dashboard-grid #stepDispatch,
+  .dashboard-grid #stepProtect,
+  .dashboard-grid #stepDecrypt {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .panel-modalities,

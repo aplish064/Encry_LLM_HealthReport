@@ -26,10 +26,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from privacy_shuffle import (
-    build_display_candidates,
-    derive_privacy_profile,
-    generate_synthetic_candidate_pool,
-    select_protected_candidate,
+    build_anonymous_database,
+    build_distribution_summary,
+    build_protected_llm_summary,
+    build_real_data_record,
+    generate_synthetic_database,
 )
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -1091,6 +1092,15 @@ def build_health_report(results: List[Dict], uwb_data: np.ndarray, imu_data: np.
     if not drivers:
         drivers.append("No dominant risk drivers detected in this demo cycle")
 
+    # 健康指数（跌倒概率的反向映射）
+    health_index = 1 - fall_prob
+    if health_index >= 0.7:
+        health_level = "High"
+    elif health_index >= 0.4:
+        health_level = "Moderate"
+    else:
+        health_level = "Low"
+
     # 建议
     recos = [
         "If dizziness or recent falls are present, consider supervised ambulation and a home safety check.",
@@ -1098,10 +1108,10 @@ def build_health_report(results: List[Dict], uwb_data: np.ndarray, imu_data: np.
         "Hydration and gradual warm-up may reduce transient gait instability.",
         "This demo report is not medical advice; consult a clinician for interpretation.",
     ]
-    if fall_level == "High":
-        recos.insert(0, "Fall risk appears high in this demo cycle—prioritize assistive support and remove trip hazards.")
-    elif fall_level == "Moderate":
-        recos.insert(0, "Fall risk appears moderate—monitor gait stability and consider balance exercises.")
+    if health_level == "Low":
+        recos.insert(0, "Health index appears low in this demo cycle—prioritize assistive support and remove trip hazards.")
+    elif health_level == "Moderate":
+        recos.insert(0, "Health index appears reduced—monitor gait stability and consider balance exercises.")
 
     # 整体状态
     overall = "Stable"
@@ -1112,7 +1122,7 @@ def build_health_report(results: List[Dict], uwb_data: np.ndarray, imu_data: np.
 
     # 叙述性报告
     narrative = (
-        f"Overall status: {overall}. Fall risk estimate: {fall_level} (p={fall_prob:.2f}).\n"
+        f"Overall status: {overall}. Health index estimate: {health_level} (score={health_index:.2f}).\n"
         f"Key drivers: " + "; ".join(drivers[:3]) + ".\n"
         "\n"
         "Interpretation (demo): Sensor-derived proxies suggest current mobility and physiologic state. "
@@ -1163,7 +1173,7 @@ def build_health_report(results: List[Dict], uwb_data: np.ndarray, imu_data: np.
 async def call_zhipu_llm(prompt: str, max_tokens: int = 1024) -> str:
     """调用智谱AI API"""
     if not ZHIPU_API_KEY:
-        return "智谱AI未配置，使用默认报告结论。"
+        return "ZhipuAI is not configured. Returning a fallback protected conclusion."
     try:
         headers = {
             "Authorization": f"Bearer {ZHIPU_API_KEY}",
@@ -1189,10 +1199,10 @@ async def call_zhipu_llm(prompt: str, max_tokens: int = 1024) -> str:
             if "content" in result and len(result["content"]) > 0:
                 return result["content"][0]["text"]
             else:
-                return "智谱AI调用成功但返回格式异常"
+                return "ZhipuAI returned success, but response format was unexpected."
 
     except Exception as e:
-        return f"智谱AI调用失败，使用默认报告: {str(e)}"
+        return f"ZhipuAI call failed, using fallback protected conclusion: {str(e)}"
 
 @app.get("/api/health")
 async def health_check():
@@ -1221,16 +1231,16 @@ async def get_modalities():
         # 如果配置文件不存在，返回默认配置
         default_config = {
             "modalities": [
-                {"id": "depth", "name": "深度图像", "type": "image", "description": "睡眠姿态检测", "icon": "🛏️"},
-                {"id": "uwb", "name": "UWB雷达", "type": "timeseries", "description": "心率、血压监测", "icon": "📡"},
-                {"id": "imu", "name": "IMU传感器", "type": "timeseries", "description": "步态分析、代谢评估", "icon": "🏃"},
-                {"id": "csi", "name": "CSI信号", "type": "timeseries", "description": "心率、呼吸监测", "icon": "📶"},
-                {"id": "rgb", "name": "RGB图像", "type": "image", "description": "风险评分、跌倒检测", "icon": "📷"},
-                {"id": "ntu", "name": "NTU", "type": "skeleton", "description": "动作识别、行为分析", "icon": "🦴"},
-                {"id": "retina", "name": "视网膜图像", "type": "medical_image", "description": "心血管疾病早期预警", "icon": "👁️"},
-                {"id": "chest", "name": "胸部X光", "type": "medical_image", "description": "肺部疾病筛查", "icon": "🫁"},
-                {"id": "path", "name": "组织病理", "type": "medical_image", "description": "癌症筛查", "icon": "🔬"},
-                {"id": "blood", "name": "血细胞", "type": "medical_image", "description": "血液疾病诊断", "icon": "🩸"}
+                {"id": "depth", "name": "Depth Camera", "type": "image", "description": "Sleep posture detection", "icon": "🛏️"},
+                {"id": "uwb", "name": "UWB Radar", "type": "timeseries", "description": "Heart rate and blood pressure monitoring", "icon": "📡"},
+                {"id": "imu", "name": "IMU Sensor", "type": "timeseries", "description": "Gait and metabolic assessment", "icon": "🏃"},
+                {"id": "csi", "name": "WiFi CSI", "type": "timeseries", "description": "Heart rate and respiration monitoring", "icon": "📶"},
+                {"id": "rgb", "name": "RGB Camera", "type": "image", "description": "Risk scoring and activity assessment", "icon": "📷"},
+                {"id": "ntu", "name": "NTU Skeleton", "type": "skeleton", "description": "Action recognition and behavior analysis", "icon": "🦴"},
+                {"id": "retina", "name": "Retina Image", "type": "medical_image", "description": "Early cardiovascular risk screening", "icon": "👁️"},
+                {"id": "chest", "name": "Chest X-ray", "type": "medical_image", "description": "Lung condition screening", "icon": "🫁"},
+                {"id": "path", "name": "Pathology Image", "type": "medical_image", "description": "Cancer screening", "icon": "🔬"},
+                {"id": "blood", "name": "Blood Cell Image", "type": "medical_image", "description": "Hematology screening", "icon": "🩸"}
             ]
         }
 
@@ -1591,6 +1601,66 @@ def _build_step2(flags: Dict[str, Any], series: Dict[str, Optional[np.ndarray]])
         "raw_results": results,
     }
 
+
+def _build_bucketed_llm_prompt(protected_llm_summary: Dict[str, Any]) -> str:
+    return (
+        "You are a health monitoring analysis expert. "
+        "The external model can only see a bucketed privacy-preserving summary. "
+        f"Record: {protected_llm_summary['record']}; "
+        f"Overall status: {protected_llm_summary['risk_profile']['overall']}; "
+        f"Health index bucket: {protected_llm_summary['risk_profile']['fall_probability_bucket']}; "
+        f"Metric summary: {protected_llm_summary['metrics']}; "
+        f"Model summary: {protected_llm_summary['model_results'][:3]}. "
+        "Generate a concise and cautious health conclusion."
+    )
+
+
+def _build_synthetic_database_privacy(
+    raw_results: List[Dict[str, Any]],
+    raw_report: Dict[str, Any],
+    rng: random.Random,
+) -> Dict[str, Any]:
+    real_record = build_real_data_record(raw_results, raw_report)
+    synthetic_records = generate_synthetic_database(real_record, database_size=100, rng=rng)
+    anonymous_bundle = build_anonymous_database(real_record, synthetic_records, rng=rng)
+    protected_llm_summary = build_protected_llm_summary(anonymous_bundle["selected_record"])
+    distribution_summary = build_distribution_summary(anonymous_bundle)
+    return {
+        "protected_llm_summary": protected_llm_summary,
+        "privacy_protection": {
+            "enabled": True,
+            "method": "synthetic_database_shuffle",
+            "database_size": len(anonymous_bundle["anonymous_database"]),
+            "synthetic_record_count": distribution_summary["synthetic_record_count"],
+            "distribution_summary": {
+                "risk_buckets": distribution_summary["risk_buckets"],
+                "scatter_points": distribution_summary["scatter_points"],
+                "target_point": distribution_summary["target_point"],
+                "axes": distribution_summary["axes"],
+            },
+            "token_flow": distribution_summary["token_flow"],
+            "anonymous_database_preview": anonymous_bundle["anonymous_database_preview"],
+            "shuffle_order_preview": anonymous_bundle["shuffle_order_preview"],
+            "selected_record_label": anonymous_bundle["selected_record_label"],
+            "selected_record_index": anonymous_bundle["selected_record_index"],
+            "llm_summary_mode": "bucketed_non_trusted",
+            "protected_llm_summary_preview": protected_llm_summary,
+            "generation_policy": {
+                "distribution": "risk-bucket conditioned",
+                "constraints": [
+                    "physiological range",
+                    "cross-model consistency",
+                    "activity mix normalization",
+                ],
+            },
+            "summary": (
+                "Synthetic database masks the real inference record before a bucketed summary "
+                "is sent to the non-trusted LLM."
+            ),
+        },
+    }
+
+
 async def _build_privacy_and_report(session: Dict[str, Any]) -> Dict[str, Any]:
     step_start = time.time()
     series = session["series"]
@@ -1601,57 +1671,30 @@ async def _build_privacy_and_report(session: Dict[str, Any]) -> Dict[str, Any]:
 
     raw_report = build_health_report(raw_results, uwb_for_report, imu_for_report, csi_for_report)
     rng = random.Random(session["seed"])
-    profile = derive_privacy_profile(raw_results, raw_report)
-    candidate_pool = generate_synthetic_candidate_pool(profile, raw_results, raw_report, pool_size=10, rng=rng)
-    protected_candidate = select_protected_candidate(candidate_pool, rng=rng)
-    display_candidates = build_display_candidates(candidate_pool, limit=4)
-    report = protected_candidate["report"]
-
-    prompt = (
-        "你是一个健康监测分析专家。请基于隐私保护后的多模态健康报告生成简洁结论。"
-        f"整体评估: {report['overall']}; "
-        f"跌倒风险: {report['fall_risk']['level']} ({report['fall_risk']['probability']:.1%}); "
-        f"建议: {'; '.join(report.get('recommendations', [])[:3])}"
-    )
+    privacy_bundle = _build_synthetic_database_privacy(raw_results, raw_report, rng)
+    prompt = _build_bucketed_llm_prompt(privacy_bundle["protected_llm_summary"])
     report_conclusion = await call_zhipu_llm(prompt)
     return {
         "step3": {
             "time_sec": time.time() - step_start,
-            "results": protected_candidate["results"],
+            "results": raw_results,
             "report_conclusion": report_conclusion,
-            "report": report,
+            "plaintext_prompt": prompt,
+            "report": raw_report,
         },
-        "privacy_protection": {
-            "enabled": True,
-            "method": "synthetic_shuffle",
-            "pool_size": len(candidate_pool),
-            "display_candidates": display_candidates,
-            "selected_label": "Protected Output",
-            "summary": "Final report selected from shuffled synthetic candidates.",
-            "pipeline": [
-                {"id": "pool", "label": "Candidate Pool", "detail": "Generate synthetic neighbors from encrypted inference profile."},
-                {"id": "shuffle", "label": "Shuffle", "detail": "Randomize candidate order to reduce direct linkage."},
-                {"id": "mask", "label": "Mask Linkage", "detail": "Expose summarized candidates instead of raw model outputs."},
-                {"id": "selected", "label": "Protected Output", "detail": "Select one protected candidate for the report."},
-            ],
-            "metrics": {
-                "pool_size": len(candidate_pool),
-                "displayed_candidates": len(display_candidates),
-                "linkage_exposure": "Reduced",
-                "output_mode": "Protected selection",
-            },
-        },
+        "privacy_protection": privacy_bundle["privacy_protection"],
     }
 
 @app.get("/api/dispatch")
 async def run_dispatch(selected_modalities: Optional[str] = None):
     start_time = time.time()
+    session_seed = time.time_ns()
     flags = _selected_flags(selected_modalities)
     step1_bundle = _build_step1(flags)
     step2_bundle = _build_step2(flags, step1_bundle["series"])
     session_id = uuid.uuid4().hex
     _STAGED_SESSIONS[session_id] = {
-        "seed": int(start_time),
+        "seed": session_seed,
         "selected_modalities": selected_modalities,
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "step1": step1_bundle["step1"],
@@ -1676,10 +1719,12 @@ async def run_privacy_shuffle(session_id: str):
         return {"error": "Unknown or expired session_id"}
     if "privacy_protection" not in session or "step3" not in session:
         session.update(await _build_privacy_and_report(session))
+    plaintext_prompt = session.get("step3", {}).get("plaintext_prompt") or session.get("step3", {}).get("llm_prompt")
     return {
         "schema": "he-multimodal-privacy/v1",
         "session_id": session_id,
         "privacy_protection": session["privacy_protection"],
+        "plaintext_prompt": plaintext_prompt,
     }
 
 @app.get("/api/report")
@@ -1708,6 +1753,7 @@ async def run_cycle(selected_modalities: Optional[str] = None):
                            Example: "UWB,IMU,CSI" or "Depth,RGB"
     """
     start_time = time.time()
+    cycle_seed = time.time_ns()
 
     # Load modality configuration
     modality_config = load_modality_config()
@@ -2008,78 +2054,19 @@ async def run_cycle(selected_modalities: Optional[str] = None):
 
         raw_results = results
         raw_report = build_health_report(raw_results, uwb_for_report, imu_for_report, csi_for_report)
-        rng = random.Random(int(start_time))
-        profile = derive_privacy_profile(raw_results, raw_report)
-        candidate_pool = generate_synthetic_candidate_pool(
-            profile,
-            raw_results,
-            raw_report,
-            pool_size=10,
-            rng=rng,
-        )
-        protected_candidate = select_protected_candidate(candidate_pool, rng=rng)
-        display_candidates = build_display_candidates(candidate_pool, limit=4)
-
-        results = protected_candidate["results"]
-        report = protected_candidate["report"]
-
-        # 调用智谱AI增强结论
-        activity_mix = report['charts']['activity_mix']
-        radar_scores = report['charts']['radar']['values']
-
-        llm_prompt = f"""你是一个健康监测分析专家，基于UT_HAR人体活动识别数据集的监测结果，请生成专业的健康评估结论。
-
-【数据来源】UT_HAR人体活动识别数据集 - 通过多模态传感器(深度、UWB、IMU、CSI、RGB)采集
-
-【整体评估】{report['overall']}
-【跌倒风险】{report['fall_risk']['level']} (概率: {report['fall_risk']['probability']:.1%})
-
-【核心生理指标】
-- 心率: {report['metrics'][0]['value']} bpm (参考范围: {report['metrics'][0]['ref']}, 状态: {report['metrics'][0]['status']})
-- 呼吸率: {report['metrics'][1]['value']} rpm (参考范围: {report['metrics'][1]['ref']}, 状态: {report['metrics'][1]['status']})
-- 血压: {report['metrics'][2]['value']} mmHg (参考范围: {report['metrics'][2]['ref']}, 状态: {report['metrics'][2]['status']})
-- 血氧饱和度: {report['metrics'][3]['value']}% (参考范围: {report['metrics'][3]['ref']}, 状态: {report['metrics'][3]['status']})
-- 睡眠效率: {report['metrics'][4]['value']}% (参考范围: {report['metrics'][4]['ref']}, 状态: {report['metrics'][4]['status']})
-- 步态频率: {report['metrics'][5]['value']} spm (参考范围: {report['metrics'][5]['ref']}, 状态: {report['metrics'][5]['status']})
-
-【活动模式分析】
-- 行走: {activity_mix['values'][0]:.1%}
-- 站立: {activity_mix['values'][1]:.1%}
-- 坐姿: {activity_mix['values'][2]:.1%}
-- 睡眠: {activity_mix['values'][3]:.1%}
-
-【功能评估】
-- 心血管功能: {radar_scores[0]:.0f}/100
-- 血压调节: {radar_scores[1]:.0f}/100
-- 睡眠质量: {radar_scores[2]:.0f}/100
-- 代谢水平: {radar_scores[3]:.0f}/100
-- 恢复能力: {radar_scores[4]:.0f}/100
-- 安全性: {radar_scores[5]:.0f}/100
-
-【主要风险因素】
-{chr(10).join([f"- {driver}" for driver in report['fall_risk']['drivers']])}
-
-【技术特点】
-✅ 使用CKKS同态加密保护数据隐私
-✅ 5种模态传感器融合分析
-✅ 6个健康预测模型并行推理
-
-请提供：
-1. 整体健康状况评估（1-2句话）
-2. 主要发现和关注点（2-3句话）
-3. 具体改善建议（2-3句话）
-
-要求：专业、准确、实用性强的医学表述，避免过于技术性的术语。"""
-
+        rng = random.Random(cycle_seed)
+        privacy_bundle = _build_synthetic_database_privacy(raw_results, raw_report, rng)
+        llm_prompt = _build_bucketed_llm_prompt(privacy_bundle["protected_llm_summary"])
         report_conclusion = await call_zhipu_llm(llm_prompt)
 
         step3_time = time.time() - step3_start
 
         step3_data = {
             "time_sec": step3_time,
-            "results": results,
+            "results": raw_results,
             "report_conclusion": report_conclusion,
-            "report": report,  # 完整的报告对象
+            "plaintext_prompt": llm_prompt,
+            "report": raw_report,  # 完整的报告对象
         }
     except Exception as e:
         return {"error": f"Step 3 failed: {str(e)}"}
@@ -2091,14 +2078,7 @@ async def run_cycle(selected_modalities: Optional[str] = None):
         "step1": step1_data,
         "step2": step2_data,
         "step3": step3_data,
-        "privacy_protection": {
-            "enabled": True,
-            "method": "synthetic_shuffle",
-            "pool_size": 10,
-            "display_candidates": display_candidates,
-            "selected_label": "Protected Output",
-            "summary": "Final report selected from shuffled synthetic candidates.",
-        },
+        "privacy_protection": privacy_bundle["privacy_protection"],
         "data_source": "UT_HAR dataset",
         "llm_provider": "ZhipuAI"
     }

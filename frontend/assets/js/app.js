@@ -1,5 +1,8 @@
 // frontend/assets/js/app.js
-const API_BASE = (window.API_BASE || "http://127.0.0.1:8082");
+const API_BASE = (
+  window.API_BASE ||
+  `${window.location.protocol}//${window.location.hostname}:8082`
+);
 
 const $ = (id) => document.getElementById(id);
 
@@ -40,7 +43,7 @@ function setPill(id, text) {
 
 function safeText(x, fallback="—") {
   if (x === null || x === undefined) return fallback;
-  const s = String(x);
+  const s = String(x).trim();
   return s.length ? s : fallback;
 }
 
@@ -250,22 +253,22 @@ function svgGauge(prob, label) {
   const pct = Math.round(p * 100);
   const fillWidth = barWidth * p;
 
-  // Color based on risk level
-  const barColor = p >= 0.7 ? "#ef4444" : (p >= 0.4 ? "#f97316" : "#22c55e");
-  const barColorLight = p >= 0.7 ? "rgba(239, 68, 68, 0.15)" : (p >= 0.4 ? "rgba(249, 115, 22, 0.15)" : "rgba(34, 197, 94, 0.15)");
+  // Color based on health index level
+  const barColor = p >= 0.7 ? "#22c55e" : (p >= 0.4 ? "#f97316" : "#ef4444");
+  const barColorLight = p >= 0.7 ? "rgba(34, 197, 94, 0.15)" : (p >= 0.4 ? "rgba(249, 115, 22, 0.15)" : "rgba(239, 68, 68, 0.15)");
 
-  // Risk level indicators
+  // Health index indicators (three non-hierarchical bands)
   const lowEnd = barX + barWidth * 0.4;
   const highStart = barX + barWidth * 0.7;
 
   return `
-  <svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Fall probability">
+  <svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Health index">
     <rect x="1" y="1" width="${w-2}" height="${h-2}" rx="12" fill="#ffffff" stroke="rgba(230,232,239,.8)"/>
 
-    <!-- Risk zone backgrounds -->
-    <rect x="${barX}" y="${barY}" width="${barWidth * 0.4}" height="${barHeight}" fill="rgba(34, 197, 94, 0.08)" rx="8"/>
+    <!-- Health-index band backgrounds -->
+    <rect x="${barX}" y="${barY}" width="${barWidth * 0.4}" height="${barHeight}" fill="rgba(239, 68, 68, 0.08)" rx="8"/>
     <rect x="${lowEnd}" y="${barY}" width="${barWidth * 0.3}" height="${barHeight}" fill="rgba(249, 115, 22, 0.08)"/>
-    <rect x="${highStart}" y="${barY}" width="${barWidth * 0.3}" height="${barHeight}" fill="rgba(239, 68, 68, 0.08)" rx="8"/>
+    <rect x="${highStart}" y="${barY}" width="${barWidth * 0.3}" height="${barHeight}" fill="rgba(34, 197, 94, 0.08)" rx="8"/>
 
     <!-- Background bar -->
     <rect x="${barX}" y="${barY}" width="${barWidth}" height="${barHeight}" fill="rgba(15,23,42,.06)" stroke="rgba(15,23,42,.12)" stroke-width="1" rx="8"/>
@@ -274,9 +277,9 @@ function svgGauge(prob, label) {
     <rect x="${barX}" y="${barY}" width="${fillWidth.toFixed(2)}" height="${barHeight}" fill="${barColor}" rx="8"/>
 
     <!-- Zone labels -->
-    <text x="${barX + barWidth * 0.2}" y="${barY + barHeight + 18}" text-anchor="middle" font-size="10" font-weight="700" fill="#22c55e">Low</text>
-    <text x="${barX + barWidth * 0.55}" y="${barY + barHeight + 18}" text-anchor="middle" font-size="10" font-weight="700" fill="#f97316">Moderate</text>
-    <text x="${barX + barWidth * 0.85}" y="${barY + barHeight + 18}" text-anchor="middle" font-size="10" font-weight="700" fill="#ef4444">High</text>
+    <text x="${barX + barWidth * 0.2}" y="${barY + barHeight + 18}" text-anchor="middle" font-size="10" font-weight="700" fill="#ef4444">Zone 1</text>
+    <text x="${barX + barWidth * 0.55}" y="${barY + barHeight + 18}" text-anchor="middle" font-size="10" font-weight="700" fill="#f97316">Zone 2</text>
+    <text x="${barX + barWidth * 0.85}" y="${barY + barHeight + 18}" text-anchor="middle" font-size="10" font-weight="700" fill="#22c55e">Zone 3</text>
 
     <!-- Percentage and label -->
     <text x="${w / 2}" y="35" text-anchor="middle" font-size="32" font-weight="900" fill="#0f172a">${pct}%</text>
@@ -511,74 +514,250 @@ function renderDetailedAnalysis(modality) {
   panel.innerHTML = html;
 }
 
+let privacyAnimationTimer = null;
+let privacyAnimationFrame = null;
+let privacyAnimationRenderId = 0;
+
 function renderPrivacyProtection(privacy) {
   const panel = $("privacyPanel");
   if (!panel) return;
+
+  if (privacyAnimationFrame) {
+    window.cancelAnimationFrame(privacyAnimationFrame);
+    privacyAnimationFrame = null;
+  }
+  if (privacyAnimationTimer) {
+    window.clearTimeout(privacyAnimationTimer);
+    privacyAnimationTimer = null;
+  }
+  panel.classList.remove("is-playing", "is-idle", "is-complete", "step-by-step");
+
   if (!privacy || !privacy.enabled) {
-    panel.innerHTML = '<div class="hint">隐私保护数据暂不可用。</div>';
+    panel.innerHTML = '<div class="hint">Protected privacy data is unavailable.</div>';
     return;
   }
 
-  const pipeline = [
-    { label: "候选池", detail: "根据加密推理结果生成相似的合成候选。" },
-    { label: "混洗", detail: "随机打乱候选顺序，切断直接对应关系。" },
-    { label: "关联掩蔽", detail: "只暴露摘要候选，不暴露原始模型输出。" },
-    { label: "受保护输出", detail: "从混洗候选中选择最终报告来源。" },
+  const distributionSummary = privacy.distribution_summary || {};
+  const valueHistogram = Array.isArray(distributionSummary.value_histogram)
+    ? distributionSummary.value_histogram
+    : [];
+  const scatterPoints = Array.isArray(distributionSummary.scatter_points)
+    ? distributionSummary.scatter_points
+    : [];
+  const targetPoint = distributionSummary.target_point || {};
+  const tokenFlow = privacy.token_flow || distributionSummary.token_flow || {};
+  const rawPoolSize = privacy.database_size ?? privacy.pool_size ?? 101;
+  const parsedPoolSize = Number(rawPoolSize);
+  const poolSize = Math.min(
+    Number.isFinite(parsedPoolSize) ? Math.max(0, Math.floor(parsedPoolSize)) : 101,
+    101
+  );
+  const numericBars = valueHistogram.length ? valueHistogram : [
+    { start: 0.08, end: 0.18, count: 7 },
+    { start: 0.18, end: 0.28, count: 13 },
+    { start: 0.28, end: 0.38, count: 21 },
+    { start: 0.38, end: 0.48, count: 26 },
+    { start: 0.48, end: 0.58, count: 18 },
+    { start: 0.58, end: 0.68, count: 9 },
+    { start: 0.68, end: 0.78, count: 5 },
+    { start: 0.78, end: 0.88, count: 2 },
   ];
-  const poolSize = Math.min(Number(privacy.pool_size || privacy.metrics?.pool_size || 10), 10);
-  const tokens = Array.from({ length: poolSize }, (_, index) => {
-    const slot = ((index * 7) % 10) + 1;
-    return `<div class="mixerToken" style="--slot:${slot}; --delay:${700 + index * 130}ms">C${index + 1}</div>`;
+  const maxBucketCount = Math.max(1, ...numericBars.map((bucket) => Number(bucket.count || 0)));
+  const histogramBars = numericBars.map((bucket) => {
+    const height = Math.max(14, Math.round((Number(bucket.count || 0) / maxBucketCount) * 70));
+    const center = (Number(bucket.start || 0) + Number(bucket.end || 0)) / 2;
+    const hue = Math.max(8, Math.min(140, Math.round(140 - center * 90)));
+    const barColor = `hsl(${hue} 74% 46%)`;
+    const rangeLabel = `${Math.round(Number(bucket.start || 0) * 100)}-${Math.round(Number(bucket.end || 0) * 100)}%`;
+    return `
+      <div class="distributionBar" style="--bar-h:${height}px; --bar-color:${barColor}">
+        <span>${escHtml(bucket.count ?? "0")}</span>
+        <em>${escHtml(rangeLabel)}</em>
+      </div>
+    `;
   }).join("");
+  const scatterSource = scatterPoints.length ? scatterPoints : Array.from({ length: 28 }, (_, index) => ({
+    x: 0.08 + ((index * 17) % 84) / 100,
+    y: 0.25 + ((index * 23) % 55) / 100,
+    bucket: index % 5 === 0 ? "elevated" : index % 2 === 0 ? "attention" : "low",
+    target: false,
+  }));
+  const rawXs = scatterSource.map((point) => Number(point.x ?? 0.5));
+  const rawYs = scatterSource.map((point) => Number(point.y ?? 0.5));
+  const xMin = Math.min(...rawXs);
+  const xMax = Math.max(...rawXs);
+  const yMin = Math.min(...rawYs);
+  const yMax = Math.max(...rawYs);
+  const xSpan = Math.max(1e-4, xMax - xMin);
+  const ySpan = Math.max(1e-4, yMax - yMin);
 
-  const pipelineHtml = pipeline.map((stage, index) => `
-    <div class="privacyStage ${index === pipeline.length - 1 ? "active" : ""}" style="--delay:${index * 1400}ms">
-      <div class="privacyStageIndex">${index + 1}</div>
-      <div>
-        <div class="privacyStageTitle">${escHtml(stage.label)}</div>
-        <div class="privacyStageDetail">${escHtml(stage.detail || "")}</div>
+  const scatterDots = scatterSource.map((point, index) => {
+    const rawX = Number(point.x ?? 0.5);
+    const rawY = Number(point.y ?? 0.5);
+    const xNorm = (rawX - xMin) / xSpan;
+    const yNorm = (rawY - yMin) / ySpan;
+    const jitterX = (((index * 37) % 11) - 5) * 0.003;
+    const jitterY = (((index * 19) % 11) - 5) * 0.003;
+    const x = Math.max(4, Math.min(96, (0.06 + (xNorm + jitterX) * 0.88) * 100));
+    const y = Math.max(7, Math.min(93, 100 - (0.08 + (yNorm + jitterY) * 0.84) * 100));
+    const isTarget = Boolean(point.target) || point.label === targetPoint.label;
+    const dotColor = isTarget
+      ? "#2563eb"
+      : `hsl(${Math.max(10, Math.min(145, Math.round(145 - Number(point.x ?? 0.5) * 90)))} 70% 44%)`;
+    return `<span class="distributionDot ${isTarget ? "targetDot" : ""}" style="--x:${x}%; --y:${y}%; --dot-color:${dotColor}; --i:${index}"></span>`;
+  }).join("");
+  const targetX = Math.max(3, Math.min(96, Number(targetPoint.x ?? 0.56) * 100));
+  const targetY = Math.max(6, Math.min(92, 100 - Number(targetPoint.y ?? 0.41) * 100));
+  const distributionVisual = `
+    <div class="distributionPanel">
+      <div class="distributionHead">
+        <strong>Synthetic Database Distribution</strong>
+        <span>${escHtml(String(privacy.synthetic_record_count || Math.max(0, poolSize - 1)))} fake + target</span>
+      </div>
+      <div class="distributionBars">${histogramBars}</div>
+      <div class="distributionScatter" aria-label="synthetic database distribution">
+        ${scatterDots}
+        <span class="targetLocator" style="--x:${targetX}%; --y:${targetY}%">target hidden in distribution</span>
       </div>
     </div>
-  `).join("");
+  `;
+
+  const shuffleOrderPreview = Array.isArray(privacy.shuffle_order_preview)
+    ? privacy.shuffle_order_preview.map((label) => safeText(label)).filter(Boolean).slice(0, 6)
+    : [];
+  const fallbackOrderLabels = Array.from({ length: 6 }, (_, index) => `Synthetic Record ${String(index + 1).padStart(2, "0")}`);
+  const selectedRecordText = safeText(privacy.selected_record_label || targetPoint.label, "");
+  const orderLabels = (shuffleOrderPreview.length ? shuffleOrderPreview : fallbackOrderLabels).slice(0, 6);
+  const normalizedOrderLabels = orderLabels.map((label) => safeText(label));
+  if (selectedRecordText && !normalizedOrderLabels.includes(selectedRecordText)) {
+    normalizedOrderLabels[Math.max(0, normalizedOrderLabels.length - 1)] = selectedRecordText;
+  }
+  const selectedRecordTextSafe = safeText(selectedRecordText, orderLabels[0] || "Synthetic Record");
+  const selectedOrderIndexRaw = Number(privacy.selected_record_index);
+  const matchedSelectedIndex = normalizedOrderLabels.findIndex((label) => label === selectedRecordTextSafe);
+  const clampedOrderIndex =
+    Number.isInteger(selectedOrderIndexRaw) && selectedOrderIndexRaw >= 0 && normalizedOrderLabels.length
+      ? Math.min(selectedOrderIndexRaw, normalizedOrderLabels.length - 1)
+      : -1;
+  const selectedOrderIndex = clampedOrderIndex >= 0
+    ? clampedOrderIndex
+    : (matchedSelectedIndex >= 0 ? matchedSelectedIndex : 0);
+  const orderLabelsFinal = normalizedOrderLabels;
+  const orderChips = orderLabelsFinal.map((label, orderIndex) => (
+    `<span class="orderChip ${orderIndex === selectedOrderIndex ? "orderChipSelected" : ""}" style="--i:${orderIndex}">
+      ${escHtml(label)}
+    </span>`
+  )).join("");
+  const protectedSummary = privacy.protected_llm_summary_preview || {};
+  const summaryMetrics = protectedSummary.metrics || {};
+  const selectedRecordLabel = escHtml(safeText(
+    privacy.selected_record_label,
+    orderLabelsFinal[selectedOrderIndex] || orderLabelsFinal[0] || "Synthetic Record"
+  ));
+  const rawPrompt = safeText(privacy.plaintext_prompt || privacy.llm_prompt, "");
+  const plaintextPromptHtml = rawPrompt
+    ? `<details class="cipher-panel reportPromptPanel" open>
+      <summary>Plaintext Prompt (sent to untrusted LLM)</summary>
+      <pre class="v">${escHtml(rawPrompt)}</pre>
+    </details>`
+    : "";
+  const bloodPressureBucket = escHtml(summaryMetrics.blood_pressure || "masked");
+  const sleepBucket = escHtml(summaryMetrics.sleep_efficiency || "masked");
+  const bucketedSummaryThumb = `
+    <div class="bucketedSummaryCard protectedReportThumb">
+      <div class="protectedReportHead">
+        <strong>Bucketed Summary</strong>
+      </div>
+      <div class="protectedReportSource">
+        <span>${selectedRecordLabel}</span>
+      </div>
+      <div class="protectedReportBars" aria-hidden="true">
+        <span style="--w:84%"></span>
+        <span style="--w:62%"></span>
+        <span style="--w:72%"></span>
+      </div>
+      <div class="protectedReportMeta">
+        <span>Blood Pressure: ${bloodPressureBucket}</span>
+        <span>Sleep Efficiency: ${sleepBucket}</span>
+      </div>
+    </div>
+  `;
+
+  const shuffleProcess = `
+    <div class="shuffleProcess">
+      <div class="shuffleProcessStep">
+        <div class="shuffleOrder">${orderChips}</div>
+      </div>
+      <div class="processArrow">Token binding</div>
+    </div>
+  `;
+
+  const linkageMethod = `
+    <div class="linkageTrack">
+      <span class="linkageNode rawNode">Raw</span>
+      <span class="linkageBeam"></span>
+      <span class="linkageNode outputNode">Output</span>
+    </div>
+    <div class="maskOverlay">
+      <span>Shuffled order</span>
+      <span>Direct linkage is masked</span>
+    </div>
+  `;
 
   panel.innerHTML = `
-    <div class="privacySummary">
-      <strong>隐私混洗器已启动。</strong>
-      原始推理结果不会直接进入报告，而是先混入合成候选池，再通过混洗和关联掩蔽生成受保护输出。
-    </div>
-    <div class="privacyMixer">
+    <div class="privacyMixer" aria-label="Shuffle privacy pipeline">
       <div class="mixerColumn mixerRaw">
-        <div class="mixerLabel">原始加密推理摘要</div>
-        <div class="rawResultCard">
-          <strong>Raw profile</strong>
-          <span>风险摘要 / 生理指标 / 模型评分</span>
+        <div class="mixerLabel">1. Encoded model outputs</div>
+        <div class="rawResultCard rawProfileCard">
+          <strong>Encoded Inference Output</strong>
+          <div class="rawProfileMetaRow">
+            <span>Model scores / physiological metrics / risk profile</span>
+            <div class="profileLockChip">Encoded profile</div>
+          </div>
+          <div class="rawProfileBars">
+            <span style="--w:88%"></span>
+            <span style="--w:67%"></span>
+            <span style="--w:74%"></span>
+          </div>
+          <div class="backendTokenStrip">
+            <span>backend token</span>
+            <code>${escHtml(tokenFlow.generation || "H(session_seed, real_id, nonce)")}</code>
+          </div>
         </div>
       </div>
-      <div class="mixerArrow">→</div>
+      <div class="mixerArrow arrowToPool">→</div>
       <div class="mixerColumn mixerPool">
-        <div class="mixerLabel">候选池</div>
-        <div class="mixerTokenGrid">${tokens}</div>
-      </div>
-      <div class="mixerArrow">→</div>
-      <div class="mixerColumn mixerShuffle">
-        <div class="mixerLabel">混洗通道</div>
-        <div class="shuffleChamber">
-          <div class="shuffleLine"></div>
-          <div class="shuffleLine"></div>
-          <div class="shuffleLine"></div>
+        <div class="mixerLabel">2. Generate synthetic database</div>
+        <div class="syntheticDatabaseStack">
+          ${distributionVisual}
         </div>
       </div>
-      <div class="mixerArrow">→</div>
+      <div class="mixerArrow arrowToShuffle">→</div>
+      <div class="mixerColumn mixerShuffle">
+        <div class="mixerLabel">3. Real record anonymization and shuffle</div>
+        <div class="selectionRule">
+          <span>token_map</span>
+          ${escHtml(tokenFlow.lookup || "real_record = token_map[token]")}
+        </div>
+        <div class="shuffleMethodStage">
+          ${linkageMethod}
+          ${shuffleProcess}
+        </div>
+      </div>
+      <div class="mixerArrow arrowToOutput">→</div>
       <div class="mixerColumn mixerProtected">
-        <div class="mixerLabel">受保护输出</div>
-        <div class="protectedOutputCard">Protected Output</div>
+        <div class="mixerLabel">4. Bucketed summary enters untrusted LLM</div>
+        <div class="protectedOutputCard">
+          ${plaintextPromptHtml}
+          ${bucketedSummaryThumb}
+        </div>
       </div>
     </div>
-    <div class="privacyPipeline">${pipelineHtml}</div>
   `;
+  panel.classList.add("step-by-step");
 }
 
-function renderHealthReport(report) {
+function renderHealthReport(report, plaintextPrompt) {
   const panel = $("conclusionPanel");
   const recoPanel = $("recommendPanel");
   if (!panel) return;
@@ -590,8 +769,7 @@ function renderHealthReport(report) {
 
   const badge = statusBadge(report.overall);
   const fall = report.fall_risk || {};
-  const fallP = Number(fall.probability ?? 0);
-  const fallLevel = fall.level || "—";
+  const healthIndex = 1 - Math.min(1, Math.max(0, Number(fall.probability ?? 0)));
 
   const metrics = report.metrics || [];
   const chips = (fall.drivers || []).map(x => `<span class="chip">${escHtml(x)}</span>`).join("");
@@ -620,11 +798,14 @@ function renderHealthReport(report) {
   const vitals = report.charts?.vitals || {};
   const radar = report.charts?.radar || {};
   const narrative = report.narrative || "";
-
   const recos = (report.recommendations || []).map(x => `<li>${escHtml(x)}</li>`).join("");
 
   // Conclusion side (no recommendations here)
   panel.innerHTML = `
+    <div class="reportProtectionBanner">
+      <span>Protected output</span>
+      Structured report keeps true encoded inference results, while the narrative is generated from the bucketed summary.
+    </div>
     <div class="reportTop">
       <div>
         <div class="reportTitle">Multimodal Health Report (demo)</div>
@@ -638,9 +819,9 @@ function renderHealthReport(report) {
 
     <div class="chartGrid">
       <div class="chartRow">
-        <div class="chartBox">
-          <div class="chartTitle">Fall probability</div>
-          <div class="svgBox">${svgGauge(fallP, `${fallLevel} risk`)}</div>
+          <div class="chartBox">
+          <div class="chartTitle">Health Index</div>
+          <div class="svgBox">${svgGauge(healthIndex, "Health index")}</div>
           <div class="chipRow">${chips}</div>
         </div>
         <div class="chartBox">
@@ -707,12 +888,15 @@ $("ctResPreview").textContent = safeText(s2.aggregate_cipher_preview);
     setPill("tDispatch", `dispatch+infer ${fmtSec(s2.time_sec)}`);
 
     // step 3
-    const privacy = data.privacy_protection || {};
+    const s3 = data.step3 || {};
+    const privacy = {
+      ...(data.privacy_protection || {}),
+      plaintext_prompt: s3.plaintext_prompt || s3.llm_prompt,
+    };
     renderPrivacyProtection(privacy);
     setPill("tProtect", privacy.enabled ? "protected" : "unavailable");
 
     // step 4
-    const s3 = data.step3 || {};
     console.log("Step 3 data:", s3);
     console.log("Results array:", s3.results);
 
@@ -721,7 +905,7 @@ $("ctResPreview").textContent = safeText(s2.aggregate_cipher_preview);
 
     // Then render report if available
     if (s3.report) {
-      renderHealthReport(s3.report);
+      renderHealthReport(s3.report, s3.plaintext_prompt || s3.llm_prompt);
       if ($("conclusionPanel")) $("conclusionPanel").style.display = "block";
       if ($("recommendPanel")) $("recommendPanel").style.display = "block";
       if ($("reportText")) $("reportText").style.display = "none";
@@ -800,7 +984,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   const privacyPanel = document.getElementById('privacyPanel');
   if (privacyPanel) {
-    privacyPanel.innerHTML = 'Select modalities and run analysis to generate protected candidates.';
+    privacyPanel.innerHTML = 'Select modalities and run analysis to open the anonymized privacy flow.';
   }
 
   const resultsTitle = document.getElementById('resultsTitle');
