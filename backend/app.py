@@ -12,7 +12,6 @@ import random
 import uuid
 from io import BytesIO
 from typing import Dict, Any, Optional, List
-from functools import lru_cache
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
@@ -72,10 +71,10 @@ MODALITY_NAME_MAP = {
     "WiFi CSI": "CSI",
     "RGB Camera": "RGB",
     "NTU": "NTU",
-    "RetinaMNIST": "Retina",
-    "ChestMNIST": "Chest",
-    "PathMNIST": "Path",
-    "BloodMNIST": "Blood",
+    "Retina Image": "Retina",
+    "Chest X-ray": "Chest",
+    "Pathology Image": "Path",
+    "Blood Cell Image": "Blood",
     # 前端使用的名称（中文 + 英文）
     "Depth": "Depth",
     "UWB": "UWB",
@@ -106,7 +105,7 @@ ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY", "")
 ZHIPU_API_URL = os.getenv("ZHIPU_API_URL", "https://open.bigmodel.cn/api/anthropic/v1/messages")
 ZHIPU_MODEL = os.getenv("ZHIPU_MODEL", "claude-3-5-sonnet-20241022")
 
-# 模型集群配置
+# 本地编码器配置
 CLUSTER_MODELS = [
     {"id": "ecg", "title": "ECG Arrhythmia", "subtitle": "CSI Heart Pattern"},
     {"id": "bp", "title": "Blood Pressure", "subtitle": "UWB Regression"},
@@ -292,7 +291,6 @@ def png_b64_from_file(path: str) -> Optional[str]:
     except Exception:
         return None
 
-@lru_cache(maxsize=1)
 def load_modality_config() -> Dict[str, Any]:
     """Load modality configuration from modality_config.json or return default config.
     Uses LRU cache to avoid repeated file reads.
@@ -955,9 +953,21 @@ def _clamp(v: float, lo: float, hi: float) -> float:
 def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + np.exp(-x))
 
-def build_health_report(results: List[Dict], uwb_data: np.ndarray, imu_data: np.ndarray, csi_data: np.ndarray, seed: int = 42) -> Dict[str, Any]:
+def build_health_report(
+    results: List[Dict],
+    uwb_data: np.ndarray,
+    imu_data: np.ndarray,
+    csi_data: np.ndarray,
+    seed: int = 42,
+    selected_modalities: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     """生成完整的健康报告 - 完全按照原始数据结构"""
     rng = np.random.default_rng(seed)
+    selected_modality_ids = [
+        str(item).strip().lower()
+        for item in (selected_modalities or [])
+        if str(item).strip()
+    ]
     fs = 24.0  # 采样率
 
     # 处理数据
@@ -1079,6 +1089,76 @@ def build_health_report(results: List[Dict], uwb_data: np.ndarray, imu_data: np.
         metric("Cadence", cadence_spm, "spm", "90–130", status_by_range(cadence_spm, 90, 130), "IMU step-frequency proxy"),
     ]
 
+    theme_order = ["integrated_risk", "mobility", "vitals", "sleep", "activity", "medical_screening"]
+    theme_definitions = {
+        "mobility": {
+            "title": "Mobility & Fall Stability",
+            "modalities": ["imu", "uwb", "rgb", "ntu"],
+            "chart_type": "stability",
+        },
+        "vitals": {
+            "title": "Cardiorespiratory Vitals",
+            "modalities": ["csi", "uwb"],
+            "chart_type": "reference_bars",
+        },
+        "sleep": {
+            "title": "Sleep & Recovery",
+            "modalities": ["depth", "csi"],
+            "chart_type": "recovery_bars",
+        },
+        "activity": {
+            "title": "Activity Pattern",
+            "modalities": ["imu", "uwb", "rgb", "ntu"],
+            "chart_type": "stacked_mix",
+        },
+        "medical_screening": {
+            "title": "Medical Image Screening",
+            "modalities": ["retina", "chest", "path", "blood"],
+            "chart_type": "risk_tiles",
+        },
+        "integrated_risk": {
+            "title": "Integrated Risk Summary",
+            "modalities": selected_modality_ids,
+            "chart_type": "radar",
+        },
+    }
+
+    metric_by_name = {item["name"].lower(): item for item in metrics}
+
+    def selected_sources(theme_id: str) -> List[str]:
+        if theme_id == "integrated_risk":
+            return selected_modality_ids if len(selected_modality_ids) >= 2 else []
+        supported = theme_definitions[theme_id]["modalities"]
+        return [item for item in selected_modality_ids if item in supported]
+
+    def metric_pick(*names: str) -> List[Dict[str, Any]]:
+        picked = []
+        for name in names:
+            metric_item = metric_by_name.get(name.lower())
+            if metric_item:
+                picked.append(metric_item)
+        return picked
+
+    def section_status(section_metrics: List[Dict[str, Any]], default_status: str = "stable") -> str:
+        statuses = {str(item.get("status", "")).lower() for item in section_metrics}
+        if "high" in statuses or "low" in statuses:
+            return "attention"
+        if "watch" in statuses or "moderate" in statuses:
+            return "watch"
+        return default_status
+
+    def abnormality_score(section_metrics: List[Dict[str, Any]]) -> int:
+        score = 0
+        for item in section_metrics:
+            status = str(item.get("status", "")).lower()
+            if status in ("high", "low", "attention"):
+                score += 30
+            elif status in ("moderate", "watch"):
+                score += 18
+            elif status == "normal":
+                score += 5
+        return score
+
     # 风险驱动因素
     drivers = []
     if mobility_r > 0.55:
@@ -1120,6 +1200,151 @@ def build_health_report(results: List[Dict], uwb_data: np.ndarray, imu_data: np.
     elif fall_level == "Moderate" or any(m["status"] in ("low", "high") for m in metrics):
         overall = "Watch"
 
+    # 动态主题区块
+    sections = []
+
+    if len(selected_modality_ids) >= 2:
+        sections.append({
+            "id": "integrated_risk",
+            "title": theme_definitions["integrated_risk"]["title"],
+            "status": overall.lower(),
+            "priority": 85 + min(10, len(selected_modality_ids)),
+            "source_modalities": selected_sources("integrated_risk"),
+            "chart_type": "radar",
+            "chart": {"labels": radar_labels, "values": [float(x) for x in radar_values]},
+            "metrics": [
+                metric(
+                    "Health index",
+                    health_index * 100,
+                    "%",
+                    "70-100",
+                    "normal" if health_index >= 0.7 else "low"
+                ),
+                metric("Data coverage", len(selected_modality_ids), "modalities", "2+", "normal"),
+            ],
+            "insight": "Cross-modal evidence is summarized into a single protected health profile.",
+        })
+
+    mobility_metrics = metric_pick("Cadence")
+    if selected_sources("mobility"):
+        sections.append({
+            "id": "mobility",
+            "title": theme_definitions["mobility"]["title"],
+            "status": "attention" if mobility_r > 0.55 else "stable",
+            "priority": abnormality_score(mobility_metrics) + int(mobility_r * 60) + 20,
+            "source_modalities": selected_sources("mobility"),
+            "chart_type": "stability",
+            "chart": {
+                "score": float(1.0 - mobility_r),
+                "trend": [float(x) for x in np.clip(np.linspace(1.0 - mobility_r * 0.7, 1.0 - mobility_r, 8), 0, 1).tolist()],
+                "drift": float(uwb_drift),
+                "gait_variability": float(gait_var),
+            },
+            "metrics": mobility_metrics + [
+                metric("Movement drift", uwb_drift, "", "<0.08", "high" if uwb_drift > 0.08 else "normal"),
+            ],
+            "insight": "Movement stability is estimated from gait variability and radar motion drift.",
+        })
+
+    vitals_metrics = metric_pick("Heart rate", "Resp. rate", "Blood pressure", "SpO₂")
+    if selected_sources("vitals"):
+        sections.append({
+            "id": "vitals",
+            "title": theme_definitions["vitals"]["title"],
+            "status": section_status(vitals_metrics),
+            "priority": abnormality_score(vitals_metrics) + int(cardio_r * 30) + int(bp_r * 30),
+            "source_modalities": selected_sources("vitals"),
+            "chart_type": "reference_bars",
+            "chart": {
+                "labels": ["HR", "RR", "SBP", "SpO2"],
+                "values": [float(hr_bpm if not np.isnan(hr_bpm) else 75.0), float(rr_bpm if not np.isnan(rr_bpm) else 16.0), float(sbp), float(spo2)],
+                "ranges": {"HR": [60, 100], "RR": [12, 20], "SBP": [90, 120], "SpO2": [95, 100]},
+            },
+            "metrics": vitals_metrics[:4],
+            "insight": "Cardiorespiratory proxies are compared against demo reference bands.",
+        })
+
+    sleep_metrics = metric_pick("Sleep efficiency", "Resp. rate")
+    if selected_sources("sleep"):
+        sections.append({
+            "id": "sleep",
+            "title": theme_definitions["sleep"]["title"],
+            "status": "attention" if sleep_eff < 85 else "stable",
+            "priority": abnormality_score(sleep_metrics) + int(sleep_r * 55),
+            "source_modalities": selected_sources("sleep"),
+            "chart_type": "recovery_bars",
+            "chart": {
+                "labels": ["Sleep efficiency", "Recovery", "Resp. regularity"],
+                "values": [float(sleep_eff), float(100 * (1.0 - sleep_r)), float(100 * (1.0 - cardio_r * 0.4))],
+            },
+            "metrics": sleep_metrics,
+            "insight": "Sleep and recovery are estimated from depth posture and respiratory rhythm signals.",
+        })
+
+    if selected_sources("activity"):
+        sections.append({
+            "id": "activity",
+            "title": theme_definitions["activity"]["title"],
+            "status": "stable",
+            "priority": 35 + int((mix[0] + mix[1]) * 30),
+            "source_modalities": selected_sources("activity"),
+            "chart_type": "stacked_mix",
+            "chart": {"labels": activity_labels, "values": [float(x) for x in mix.tolist()]},
+            "metrics": [
+                metric("Walk share", float(mix[0] * 100), "%", "demo mix", "normal"),
+                metric("Rest share", float((mix[2] + mix[3]) * 100), "%", "demo mix", "normal"),
+            ],
+            "insight": "Activity mix summarizes the selected motion and visual behavior signals.",
+        })
+
+    medical_sources = selected_sources("medical_screening")
+    if medical_sources:
+        image_results = [item for item in results if str(item.get("model_id", "")).lower() in {"retina", "chest", "path", "blood"}]
+        sections.append({
+            "id": "medical_screening",
+            "title": theme_definitions["medical_screening"]["title"],
+            "status": "watch" if any(str(item.get("status", "")).lower() != "normal" for item in image_results) else "stable",
+            "priority": 40 + 10 * len(image_results),
+            "source_modalities": medical_sources,
+            "chart_type": "risk_tiles",
+            "chart": {
+                "tiles": [
+                    {"label": item.get("model", item.get("model_id", "Image")), "score": item.get("score"), "status": item.get("status", "normal")}
+                    for item in image_results
+                ],
+            },
+            "metrics": [
+                metric("Image sources", len(medical_sources), "modalities", "1+", "normal"),
+            ],
+            "insight": "Medical imaging signals are summarized as demo screening tiles.",
+        })
+
+    order_index = {theme_id: index for index, theme_id in enumerate(theme_order)}
+    sections.sort(key=lambda item: (-int(item.get("priority", 0)), order_index.get(item["id"], 99)))
+    expanded_ids = {item["id"] for item in sections[:3]}
+    expanded_sections = [{**item, "expanded": item["id"] in expanded_ids} for item in sections[:3]]
+    compact_sections = [{**item, "expanded": False} for item in sections[3:]]
+
+    missing_signals = []
+    for theme_id in theme_order:
+        if theme_id == "integrated_risk":
+            if len(selected_modality_ids) < 2:
+                missing_signals.append({
+                    "theme_id": theme_id,
+                    "title": theme_definitions[theme_id]["title"],
+                    "missing_modalities": [],
+                    "message": "Select at least two modalities to unlock integrated cross-modal risk summary.",
+                })
+            continue
+        if selected_sources(theme_id):
+            continue
+        missing_signals.append({
+            "theme_id": theme_id,
+            "title": theme_definitions[theme_id]["title"],
+            "missing_modalities": theme_definitions[theme_id]["modalities"],
+            "message": f"Add {', '.join(theme_definitions[theme_id]['modalities'])} to unlock {theme_definitions[theme_id]['title']}.",
+        })
+
     # 叙述性报告
     narrative = (
         f"Overall status: {overall}. Health index estimate: {health_level} (score={health_index:.2f}).\n"
@@ -1137,6 +1362,20 @@ def build_health_report(results: List[Dict], uwb_data: np.ndarray, imu_data: np.
             "level": fall_level,
             "drivers": drivers[:4],
         },
+        "summary": {
+            "title": "Integrated Summary",
+            "health_index": float(health_index),
+            "overall": overall,
+            "drivers": drivers[:4],
+            "coverage": {
+                "selected_modalities": selected_modality_ids,
+                "available_theme_count": len(sections),
+                "total_theme_count": len(theme_order),
+            },
+        },
+        "missing_signals": missing_signals,
+        "sections": expanded_sections,
+        "compact_sections": compact_sections,
         "metrics": metrics,
         "recommendations": recos,
         "narrative": narrative,
@@ -1602,7 +1841,65 @@ def _build_step2(flags: Dict[str, Any], series: Dict[str, Optional[np.ndarray]])
     }
 
 
-def _build_bucketed_llm_prompt(protected_llm_summary: Dict[str, Any]) -> str:
+def _build_bucketed_section_prompt_summary(raw_report: Dict[str, Any]) -> List[Dict[str, Any]]:
+    preferred_order = [
+        "integrated_risk",
+        "mobility",
+        "vitals",
+        "sleep",
+        "activity",
+        "medical_screening",
+    ]
+    order_index = {section_id: index for index, section_id in enumerate(preferred_order)}
+
+    section_summaries = []
+    seen_ids = set()
+    section_candidates = list(raw_report.get("sections") or [])
+    section_candidates.extend(raw_report.get("compact_sections") or [])
+
+    def _section_id(section: Dict[str, Any]) -> str:
+        if not isinstance(section, dict):
+            return ""
+        return str(section.get("id", ""))
+
+    ordered_sections = sorted(
+        [section for section in section_candidates if isinstance(section, dict)],
+        key=lambda section: (
+            order_index.get(_section_id(section), len(preferred_order) + 1),
+            section.get("priority", 0),
+        ),
+    )
+
+    deduped_sections = []
+    for section in ordered_sections:
+        section_id = _section_id(section)
+        if section_id in seen_ids:
+            continue
+        seen_ids.add(section_id)
+        deduped_sections.append(section)
+
+    for section in deduped_sections[:3]:
+        if not isinstance(section, dict):
+            continue
+        metrics = section.get("metrics") or []
+        metric_names = []
+        for metric in metrics:
+            if isinstance(metric, dict) and metric.get("name"):
+                metric_names.append(metric.get("name"))
+        section_summaries.append({
+            "title": section.get("title"),
+            "status": section.get("status"),
+            "sources": section.get("source_modalities"),
+            "metric_names": metric_names,
+        })
+    return section_summaries
+
+
+def _build_bucketed_llm_prompt(
+    protected_llm_summary: Dict[str, Any],
+    raw_report: Optional[Dict[str, Any]] = None,
+) -> str:
+    section_summary = _build_bucketed_section_prompt_summary(raw_report) if raw_report else []
     return (
         "You are a health monitoring analysis expert. "
         "The external model can only see a bucketed privacy-preserving summary. "
@@ -1610,6 +1907,7 @@ def _build_bucketed_llm_prompt(protected_llm_summary: Dict[str, Any]) -> str:
         f"Overall status: {protected_llm_summary['risk_profile']['overall']}; "
         f"Health index bucket: {protected_llm_summary['risk_profile']['fall_probability_bucket']}; "
         f"Metric summary: {protected_llm_summary['metrics']}; "
+        f"Section summary: {section_summary}; "
         f"Model summary: {protected_llm_summary['model_results'][:3]}. "
         "Generate a concise and cautious health conclusion."
     )
@@ -1668,11 +1966,43 @@ async def _build_privacy_and_report(session: Dict[str, Any]) -> Dict[str, Any]:
     uwb_for_report = series["uwb"] if series["uwb"] is not None else np.zeros((100, 3))
     imu_for_report = series["imu"] if series["imu"] is not None else np.zeros((250, 6))
     csi_for_report = series["csi"] if series["csi"] is not None else np.zeros((200, 8))
+    session_modalities = session.get("selected_modalities")
+    selected_modality_ids = [
+        str(item).strip().lower()
+        for item in (
+            session_modalities
+            if isinstance(session_modalities, (list, tuple))
+            else (str(session_modalities).split(",") if session_modalities else [])
+        )
+        if str(item).strip()
+    ]
+    if not selected_modality_ids:
+        session_modalities = (
+            session.get("step1", {}).get("enabled_modalities", [])
+            if isinstance(session.get("step1"), dict)
+            else []
+        )
+        selected_modality_ids = [
+            str(item).strip().lower()
+            for item in (session_modalities if isinstance(session_modalities, (list, tuple)) else [session_modalities])
+            if str(item).strip()
+        ]
 
-    raw_report = build_health_report(raw_results, uwb_for_report, imu_for_report, csi_for_report)
+    selected_modality_ids = [normalize_modality_name(item).strip().lower() for item in selected_modality_ids]
+
+    raw_report = build_health_report(
+        raw_results,
+        uwb_for_report,
+        imu_for_report,
+        csi_for_report,
+        selected_modalities=selected_modality_ids,
+    )
     rng = random.Random(session["seed"])
     privacy_bundle = _build_synthetic_database_privacy(raw_results, raw_report, rng)
-    prompt = _build_bucketed_llm_prompt(privacy_bundle["protected_llm_summary"])
+    prompt = _build_bucketed_llm_prompt(
+        privacy_bundle["protected_llm_summary"],
+        raw_report=raw_report,
+    )
     report_conclusion = await call_zhipu_llm(prompt)
     return {
         "step3": {
@@ -1758,6 +2088,11 @@ async def run_cycle(selected_modalities: Optional[str] = None):
     # Load modality configuration
     modality_config = load_modality_config()
     enabled_modalities = resolve_enabled_modalities(selected_modalities, modality_config)
+    selected_modality_ids = [
+        normalize_modality_name(name).strip().lower()
+        for name in enabled_modalities
+        if normalize_modality_name(name).strip()
+    ]
 
     selected_depth = find_selected_modality(enabled_modalities, "Depth")
     selected_uwb = find_selected_modality(enabled_modalities, "UWB")
@@ -2053,10 +2388,19 @@ async def run_cycle(selected_modalities: Optional[str] = None):
         csi_for_report = csi_series if csi_series is not None else np.zeros((200, 8))
 
         raw_results = results
-        raw_report = build_health_report(raw_results, uwb_for_report, imu_for_report, csi_for_report)
+        raw_report = build_health_report(
+            raw_results,
+            uwb_for_report,
+            imu_for_report,
+            csi_for_report,
+            selected_modalities=selected_modality_ids,
+        )
         rng = random.Random(cycle_seed)
         privacy_bundle = _build_synthetic_database_privacy(raw_results, raw_report, rng)
-        llm_prompt = _build_bucketed_llm_prompt(privacy_bundle["protected_llm_summary"])
+        llm_prompt = _build_bucketed_llm_prompt(
+            privacy_bundle["protected_llm_summary"],
+            raw_report=raw_report,
+        )
         report_conclusion = await call_zhipu_llm(llm_prompt)
 
         step3_time = time.time() - step3_start

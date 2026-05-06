@@ -61,7 +61,7 @@ const MODALITY_CONFIG = {
   },
   'retina': {
     id: 'retina',
-    name: 'RetinaMNIST',
+    name: 'Retina',
     type: 'image',
     icon: '👁️',
     description: 'Retinal disease classification',
@@ -69,7 +69,7 @@ const MODALITY_CONFIG = {
   },
   'chest': {
     id: 'chest',
-    name: 'ChestMNIST',
+    name: 'Chest',
     type: 'image',
     icon: '🫁',
     description: 'Thoracic disease classification',
@@ -77,7 +77,7 @@ const MODALITY_CONFIG = {
   },
   'path': {
     id: 'path',
-    name: 'PathMNIST',
+    name: 'Pathology',
     type: 'image',
     icon: '🔬',
     description: 'Pathology image classification',
@@ -85,7 +85,7 @@ const MODALITY_CONFIG = {
   },
   'blood': {
     id: 'blood',
-    name: 'BloodMNIST',
+    name: 'Blood',
     type: 'image',
     icon: '🩸',
     description: 'Blood cell classification',

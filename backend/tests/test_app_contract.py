@@ -139,7 +139,10 @@ class AppContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(report["fall_risk"]["probability"], float)
         self.assertNotEqual(privacy["protected_llm_summary_preview"]["model_results"][0]["score_bucket"], "75.5")
         llm_prompt = self.llm_mock.call_args.args[0]
+        self.assertIn("Section summary", llm_prompt)
+        self.assertIn("Mobility & Fall Stability", llm_prompt)
         self.assertIn("bucketed", llm_prompt.lower())
+        self.assertNotIn(str(report["summary"]["health_index"]), llm_prompt)
         self.assertNotIn("75.5", llm_prompt)
         self.assertNotIn(f"{report['fall_risk']['probability']:.1%}", llm_prompt)
 

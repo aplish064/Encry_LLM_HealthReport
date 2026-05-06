@@ -432,10 +432,17 @@ function svgDonut(chart, opts = {}) {
 
   // Legend
   const legendY = h - 10;
-  const items = labels.slice(0, values.length).map((lab, i) => {
+  const legendEntries = labels.slice(0, values.length).map((lab, i) => {
     const pct = (100 * (values[i] / sum)).toFixed(0) + "%";
-    return `<span class="legendItem"><span class="legendDot" style="background:${palette[i % palette.length]}"></span>${escHtml(lab)} <span class="mono">${pct}</span></span>`;
-  }).join("");
+    return { label: lab, pct, color: palette[i % palette.length] };
+  });
+  const items = opts.compactLegend
+    ? legendEntries.map((entry) => (
+      `<span class="compactLegendItem"><span class="legendDot" style="background:${entry.color}"></span>${escHtml(entry.label)} <strong>${entry.pct}</strong></span>`
+    )).join("")
+    : legendEntries.map((entry) => (
+      `<span class="legendItem"><span class="legendDot" style="background:${entry.color}"></span>${escHtml(entry.label)} <span class="mono">${entry.pct}</span></span>`
+    )).join("");
 
   return `
   <div class="donutWrap">
@@ -445,9 +452,136 @@ function svgDonut(chart, opts = {}) {
       <circle cx="${cx}" cy="${cy}" r="${r - stroke * 0.9}" fill="#fff"/>
       <text x="${cx}" y="${cy + 6}" font-size="14" text-anchor="middle" fill="#0f172a" font-weight="700">Activity</text>
     </svg>
-    <div class="legend">${items}</div>
+    <div class="${opts.compactLegend ? "compactLegend" : "legend"}">${items}</div>
   </div>`;
 }
+
+function svgStackedMix(chart) {
+  const labels = chart?.labels || [];
+  const values = (chart?.values || []).map((value) => Math.max(0, Number(value) || 0));
+  const sum = values.reduce((acc, value) => acc + value, 0) || 1;
+  const palette = ["#7c3aed", "#06b6d4", "#f97316", "#22c55e", "#ef4444", "#eab308"];
+  let x = 0;
+  const segments = values.map((value, index) => {
+    const width = (value / sum) * 100;
+    const segment = `<rect x="${x}" y="42" width="${width}" height="34" rx="8" fill="${palette[index % palette.length]}"></rect>`;
+    x += width;
+    return segment;
+  }).join("");
+  const legend = labels.map((label, index) => `<span class="legendItem"><span class="legendDot" style="background:${palette[index % palette.length]}"></span>${escHtml(label)}</span>`).join("");
+  return `<div class="sectionSvg"><svg viewBox="0 0 100 118" preserveAspectRatio="none">${segments}</svg><div class="legend">${legend}</div></div>`;
+}
+
+function svgRecoveryBars(chart) {
+  const labels = chart?.labels || [];
+  const values = chart?.values || [];
+  const rows = labels.map((label, index) => {
+    const value = Math.max(0, Math.min(100, Number(values[index]) || 0));
+    return `
+      <div class="recoveryRow">
+        <span>${escHtml(label)}</span>
+        <div class="recoveryTrack"><i style="width:${value}%"></i></div>
+        <strong>${Math.round(value)}</strong>
+      </div>
+    `;
+  }).join("");
+  return `<div class="recoveryBars">${rows}</div>`;
+}
+
+function svgRiskTiles(chart) {
+  const tiles = Array.isArray(chart?.tiles) ? chart.tiles : [];
+  const html = tiles.length
+    ? tiles.map((tile) => `
+      <div class="riskTile ${statusClass(tile.status)}">
+        <span>${escHtml(tile.label || "Image")}</span>
+        <strong>${tile.score === undefined || tile.score === null ? "—" : escHtml(String(tile.score))}</strong>
+        <em>${escHtml(tile.status || "normal")}</em>
+      </div>
+    `).join("")
+    : `<div class="riskTile muted"><span>No image signals</span><strong>—</strong><em>missing</em></div>`;
+  return `<div class="riskTileGrid">${html}</div>`;
+}
+
+function svgStabilityChart(chart) {
+  const score = Math.max(0, Math.min(1, Number(chart?.score) || 0));
+  const trend = Array.isArray(chart?.trend) ? chart.trend : [score, score, score];
+  const points = trend.map((value, index) => {
+    const x = 18 + index * (324 / Math.max(1, trend.length - 1));
+    const y = 120 - Math.max(0, Math.min(1, Number(value) || 0)) * 86;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const color = score >= 0.7 ? "#22c55e" : score >= 0.4 ? "#f97316" : "#ef4444";
+  return `
+    <svg viewBox="0 0 360 150" role="img" aria-label="stability trend">
+      <rect x="1" y="1" width="358" height="148" rx="12" fill="#fff" stroke="rgba(230,232,239,.9)"/>
+      <rect x="18" y="34" width="${(324 * score).toFixed(1)}" height="18" rx="9" fill="${color}"/>
+      <rect x="18" y="34" width="324" height="18" rx="9" fill="none" stroke="rgba(15,23,42,.12)"/>
+      <polyline points="${points}" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="18" y="26" font-size="12" font-weight="800" fill="#0f172a">Stability ${Math.round(score * 100)}%</text>
+    </svg>
+  `;
+}
+
+function compactStabilityCard(chart) {
+  const score = Math.max(0, Math.min(1, Number(chart?.score) || 0));
+  const drift = Number(chart?.drift);
+  const variability = Number(chart?.gait_variability);
+  const extras = [
+    Number.isFinite(drift) ? `Drift ${drift.toFixed(2)}` : "",
+    Number.isFinite(variability) ? `Var ${variability.toFixed(2)}` : "",
+  ].filter(Boolean).join(" · ");
+  return `
+    <div class="compactStability">
+      <div class="compactStabilityScore">${Math.round(score * 100)}%</div>
+      <div class="compactStabilityTrack"><i style="width:${Math.round(score * 100)}%"></i></div>
+      ${extras ? `<div class="compactStabilityMeta">${escHtml(extras)}</div>` : ""}
+    </div>
+  `;
+}
+
+function statusClass(status) {
+  const s = String(status || "").toLowerCase();
+  if (s === "attention" || s === "high" || s === "low") return "attention";
+  if (s === "watch" || s === "moderate") return "watch";
+  return "stable";
+}
+
+function modalityTag(label) {
+  return `<span class="sourceTag">${escHtml(String(label || "").toUpperCase())}</span>`;
+}
+
+function metricMiniCard(metric) {
+  const value = metric?.value === null || metric?.value === undefined
+    ? "—"
+    : (Number.isFinite(Number(metric.value))
+      ? Number(metric.value).toFixed(Number(metric.value) % 1 === 0 ? 0 : 2)
+      : escHtml(metric.value));
+  const unit = metric?.unit ? `<span>${escHtml(metric.unit)}</span>` : "";
+  return `
+    <div class="miniMetric ${statusClass(metric?.status)}">
+      <div class="miniMetricName">${escHtml(metric?.name || "")}</div>
+      <div class="miniMetricValue">${value}${unit}</div>
+      ${metric?.ref ? `<div class="miniMetricRef">${escHtml(metric.ref)}</div>` : ""}
+    </div>
+  `;
+}
+
+function renderSectionChart(section, options = {}) {
+  const type = section?.chart_type;
+  const chart = section?.chart || {};
+  if (options.compact && type === "stability") return compactStabilityCard(chart);
+  if (type === "reference_bars") return svgBarVitals(chart);
+  if (type === "radar") return svgRadar(chart);
+  if (section?.id === "activity" || type === "donut") {
+    const size = options.compact ? {w: 180, h: 180} : {w: 220, h: 120};
+    return svgDonut(chart, {...size, compactLegend: options.compact});
+  }
+  if (type === "stacked_mix") return svgStackedMix(chart);
+  if (type === "recovery_bars") return svgRecoveryBars(chart);
+  if (type === "risk_tiles") return svgRiskTiles(chart);
+  return svgStabilityChart(chart);
+}
+
 function statusBadge(overall) {
   const s = String(overall || "").toLowerCase();
   if (s === "attention") return { text: "Attention", dot: "#b91c1c" };
@@ -757,7 +891,7 @@ function renderPrivacyProtection(privacy) {
   panel.classList.add("step-by-step");
 }
 
-function renderHealthReport(report, plaintextPrompt) {
+function renderLegacyHealthReport(report, plaintextPrompt) {
   const panel = $("conclusionPanel");
   const recoPanel = $("recommendPanel");
   if (!panel) return;
@@ -802,10 +936,6 @@ function renderHealthReport(report, plaintextPrompt) {
 
   // Conclusion side (no recommendations here)
   panel.innerHTML = `
-    <div class="reportProtectionBanner">
-      <span>Protected output</span>
-      Structured report keeps true encoded inference results, while the narrative is generated from the bucketed summary.
-    </div>
     <div class="reportTop">
       <div>
         <div class="reportTitle">Multimodal Health Report (demo)</div>
@@ -847,6 +977,109 @@ function renderHealthReport(report, plaintextPrompt) {
 
   // Recommendations panel
   if (recoPanel) {
+    recoPanel.innerHTML = `
+      <ul class="list">${recos || `<li>${escHtml("—")}</li>`}</ul>
+      <div class="disclaimer">${escHtml(report.disclaimer || "")}</div>
+    `;
+  }
+}
+
+function renderHealthReport(report, plaintextPrompt) {
+  const hasDynamicReport = Boolean(
+    report &&
+    typeof report === "object" &&
+    report.summary &&
+    typeof report.summary === "object" &&
+    !Array.isArray(report.summary) &&
+    ((Array.isArray(report.sections) && report.sections.length > 0) ||
+      Array.isArray(report.compact_sections) ||
+      Array.isArray(report.missing_signals))
+  );
+
+  if (!hasDynamicReport) {
+    return renderLegacyHealthReport(report, plaintextPrompt);
+  }
+  return renderDynamicHealthReport(report, plaintextPrompt);
+}
+
+function renderDynamicHealthReport(report, plaintextPrompt) {
+  const panel = $("conclusionPanel");
+  const recoPanel = $("recommendPanel");
+  if (!panel) return;
+
+  const summary = report?.summary || {};
+  const badge = statusBadge(summary.overall || report.overall);
+  const expandedSections = Array.isArray(report.sections) ? report.sections : [];
+  const compactSections = Array.isArray(report.compact_sections) ? report.compact_sections : [];
+  const missingSignals = Array.isArray(report.missing_signals) ? report.missing_signals : [];
+  const drivers = (summary.drivers || report.fall_risk?.drivers || []).map(item => `<span class="chip">${escHtml(item)}</span>`).join("");
+
+  const missingHtml = missingSignals.length ? `
+    <aside class="missingSignals">
+      <div class="missingTitle">Missing signals</div>
+      ${missingSignals.slice(0, 3).map((item) => `
+        <div class="missingItem">
+          <strong>${escHtml(item.title || "")}</strong>
+          <span>${escHtml(item.message || "")}</span>
+        </div>
+      `).join("")}
+    </aside>
+  ` : "";
+
+  const sectionHtml = expandedSections.map((section) => `
+    <section class="storySection story-${escHtml(section.id || "section")} ${statusClass(section.status)}">
+      <div class="storySectionHead">
+        <div>
+          <h3>${escHtml(section.title || "")}</h3>
+          <p>${escHtml(section.insight || "")}</p>
+        </div>
+        <div class="sourceTags">${(section.source_modalities || []).map(modalityTag).join("")}</div>
+      </div>
+      <div class="storySectionBody">
+        <div class="storyChart">${renderSectionChart(section)}</div>
+        <div class="storyMetrics">${(section.metrics || []).slice(0, 4).map(metricMiniCard).join("")}</div>
+      </div>
+    </section>
+  `).join("");
+
+  const compactHtml = compactSections.length ? `
+    <div class="compactSectionGrid">
+      ${compactSections.map((section) => `
+        <div class="compactSection compact-${escHtml(section.id || "section")} ${statusClass(section.status)}">
+          <div class="compactSectionHead">
+            <strong>${escHtml(section.title || "")}</strong>
+            <span>${(section.source_modalities || []).map((item) => escHtml(String(item).toUpperCase())).join(" + ")}</span>
+          </div>
+          <div class="compactChart">${renderSectionChart(section, {compact: true})}</div>
+        </div>
+      `).join("")}
+    </div>
+  ` : "";
+
+  panel.innerHTML = `
+    <div class="dynamicReportTop">
+      <section class="integratedSummary">
+        <div class="summaryHead">
+          <div>
+            <div class="reportTitle">${escHtml(summary.title || "Integrated Summary")}</div>
+            <div class="summaryScore">${Math.round(Number(summary.health_index || 0) * 100)}%</div>
+          </div>
+          <div class="badge">
+            <span class="badgeDot" style="background:${badge.dot}"></span>
+            <span>${escHtml(badge.text)}</span>
+          </div>
+        </div>
+        <div class="summaryTrack"><i style="width:${Math.max(0, Math.min(100, Number(summary.health_index || 0) * 100))}%"></i></div>
+        <div class="chipRow">${drivers}</div>
+      </section>
+      ${missingHtml}
+    </div>
+    <div class="storySectionStack">${sectionHtml}</div>
+    ${compactHtml}
+  `;
+
+  if (recoPanel) {
+    const recos = (report.recommendations || []).map((item) => `<li>${escHtml(item)}</li>`).join("");
     recoPanel.innerHTML = `
       <ul class="list">${recos || `<li>${escHtml("—")}</li>`}</ul>
       <div class="disclaimer">${escHtml(report.disclaimer || "")}</div>
@@ -972,19 +1205,19 @@ window.addEventListener("DOMContentLoaded", () => {
   // 初始化时清空Step 2和Step 3的内容
   const modelCluster = document.getElementById('modelCluster');
   if (modelCluster) {
-    modelCluster.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 40px;">Select modalities, then run analysis to activate model dispatch.</div>';
+    modelCluster.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #9ca3af; padding: 40px;">Select medical data, then run analysis to activate local encoders.</div>';
     console.log('✅ Step 2占位符已设置');
   }
 
   const resultTable = document.querySelector('#resultTable tbody');
   if (resultTable) {
-    resultTable.innerHTML = '<tr><td colspan="4" style="text-align:center; color: #9ca3af; padding: 20px;">Select modalities and run analysis to populate results.</td></tr>';
+    resultTable.innerHTML = '<tr><td colspan="4" style="text-align:center; color: #9ca3af; padding: 20px;">Select medical data and run analysis to populate results.</td></tr>';
     console.log('✅ Step 3占位符已设置');
   }
 
   const privacyPanel = document.getElementById('privacyPanel');
   if (privacyPanel) {
-    privacyPanel.innerHTML = 'Select modalities and run analysis to open the anonymized privacy flow.';
+    privacyPanel.innerHTML = 'Select medical data and run analysis to open the anonymized shuffle flow.';
   }
 
   const resultsTitle = document.getElementById('resultsTitle');

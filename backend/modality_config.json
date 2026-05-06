@@ -84,10 +84,10 @@
     },
     {
       "id": "retina",
-      "name": "RetinaMNIST",
+      "name": "Retina",
       "type": "dataset",
       "data_type": "image",
-      "data_path": "dataset/RetinaMNIST",
+      "data_path": "test_data/retina_sample.npz",
       "model_id": "ecg",
       "tool": "secure_ecg_toolbox",
       "description": "Retinal disease classification from fundus photography",
@@ -96,14 +96,14 @@
       "channels": 3,
       "feature_extractor": "feat_from_rgb",
       "num_classes": 5,
-      "dataset_source": "MedMNIST"
+      "dataset_source": "medical_image_benchmark"
     },
     {
       "id": "chest",
-      "name": "ChestMNIST",
+      "name": "Chest",
       "type": "dataset",
       "data_type": "image",
-      "data_path": "dataset/ChestMNIST",
+      "data_path": "test_data/chest_sample.npz",
       "model_id": "ecg",
       "tool": "secure_ecg_toolbox",
       "description": "Thoracic disease classification from chest X-rays",
@@ -112,14 +112,14 @@
       "channels": 1,
       "feature_extractor": "feat_from_depth",
       "num_classes": 5,
-      "dataset_source": "MedMNIST"
+      "dataset_source": "medical_image_benchmark"
     },
     {
       "id": "path",
-      "name": "PathMNIST",
+      "name": "Pathology",
       "type": "dataset",
       "data_type": "image",
-      "data_path": "dataset/PathMNIST",
+      "data_path": "test_data/path_sample.npz",
       "model_id": "anomaly",
       "tool": "secure_anomaly_toolbox",
       "description": "Pathology image classification for cancer detection",
@@ -128,14 +128,14 @@
       "channels": 3,
       "feature_extractor": "feat_from_rgb",
       "num_classes": 9,
-      "dataset_source": "MedMNIST"
+      "dataset_source": "medical_image_benchmark"
     },
     {
       "id": "blood",
-      "name": "BloodMNIST",
+      "name": "Blood",
       "type": "dataset",
       "data_type": "image",
-      "data_path": "dataset/BloodMNIST",
+      "data_path": "test_data/blood_sample.npz",
       "model_id": "anomaly",
       "tool": "secure_anomaly_toolbox",
       "description": "Blood cell classification from microscopic images",
@@ -144,7 +144,7 @@
       "channels": 3,
       "feature_extractor": "feat_from_rgb",
       "num_classes": 8,
-      "dataset_source": "MedMNIST"
+      "dataset_source": "medical_image_benchmark"
     }
   ],
   "tool_assignments": {

@@ -919,6 +919,11 @@ select {
   font-weight: 800;
 }
 
+.dynamicReportTop .badge{
+  border-color: rgba(47, 107, 255, .22);
+  background: linear-gradient(180deg, #ffffff, #f5f8ff);
+}
+
 .badgeDot{
   width: 10px;
   height: 10px;
@@ -990,6 +995,692 @@ select {
 
 .list{ margin: 8px 0 0 0; padding-left: 18px; font-size: 12px; line-height: 1.5; }
 .disclaimer{ margin-top: 10px; font-size: 11px; opacity: .7; }
+
+/* Dynamic report (Task 5): renderer styles */
+.dynamicReportTop{
+  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(250px, 0.95fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.integratedSummary{
+  border: 1px solid rgba(47, 107, 255, .22);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff, #fbfcff);
+  padding: 12px;
+}
+
+.summaryHead{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.summaryHead .reportTitle{
+  margin-bottom: 8px;
+}
+
+.summaryScore{
+  margin-top: 4px;
+  font-weight: 900;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.summaryTrack{
+  margin: 8px 0 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.1);
+  overflow: hidden;
+  position: relative;
+}
+
+.summaryTrack i{
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.missingSignals{
+  border: 1px solid rgba(234, 179, 8, 0.32);
+  border-radius: 14px;
+  background: #fffbeb;
+  padding: 12px;
+}
+
+.missingTitle{
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.missingItem{
+  border-top: 1px dashed rgba(0, 0, 0, 0.12);
+  padding-top: 8px;
+  margin-top: 8px;
+  color: rgba(2, 6, 23, 0.8);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.missingItem:first-child{
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.missingItem strong{
+  display: block;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.missingItem span{
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.storySectionStack{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.storySection{
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.storySectionHead{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.storySectionHead h3{
+  margin: 0 0 4px;
+  font-size: 13px;
+}
+
+.storySectionHead p{
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sourceTags{
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sourceTag{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(230, 232, 239, 0.75);
+  background: #fbfcff;
+  color: #334155;
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 3px 7px;
+  font-weight: 700;
+}
+
+.storySectionBody{
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.storyChart{
+  border: 1px solid rgba(230, 232, 239, 0.75);
+  border-radius: 12px;
+  padding: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.storyChart svg,
+.compactChart svg,
+.sectionSvg svg{
+  width: 100%;
+  height: 180px;
+  display: block;
+}
+
+.sectionSvg{
+  width: 100%;
+  min-height: 180px;
+}
+
+.storyMetrics{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.miniMetric{
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  min-height: 68px;
+  background: #ffffff;
+}
+
+.miniMetricName{
+  margin: 0;
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(2, 6, 23, 0.8);
+}
+
+.miniMetricValue{
+  margin-top: 6px;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.miniMetricValue span{
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(2, 6, 23, 0.75);
+  margin-left: 2px;
+}
+
+.miniMetricRef{
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.compactSectionGrid{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.compactSection{
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.compactSectionHead{
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(2, 6, 23, 0.86);
+}
+
+.compactSectionHead strong{
+  font-size: 12px;
+}
+
+.compactSectionHead span{
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.compactChart{
+  border: 1px solid rgba(230, 232, 239, 0.75);
+  border-radius: 12px;
+  background: #fff;
+  padding: 8px;
+}
+
+.recoveryBars{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recoveryRow{
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: rgba(2, 6, 23, 0.8);
+}
+
+.recoveryTrack{
+  position: relative;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.recoveryTrack i{
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563eb, #22c55e);
+}
+
+.riskTileGrid{
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.riskTile{
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+  background: #fff;
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.riskTile span{
+  font-weight: 700;
+}
+
+.riskTile strong{
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.riskTile em{
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.riskTile.muted{
+  border-style: dashed;
+  color: var(--muted);
+  background: #f8fafc;
+}
+
+.status{
+  --status-fg: #0f172a;
+  --status-bg: #f8fafc;
+  --status-border: #d1d5db;
+  --status-strong: #0f172a;
+}
+
+.status.attention,
+.attention{
+  --status-fg: #c2410c;
+  --status-bg: rgba(255, 247, 237, 0.92);
+  --status-border: #fdba74;
+  --status-strong: #9a3412;
+}
+
+.status.watch,
+.watch{
+  --status-fg: #854d0e;
+  --status-bg: rgba(254, 243, 199, 0.7);
+  --status-border: #fcd34d;
+  --status-strong: #a16207;
+}
+
+.status.stable,
+.stable{
+  --status-fg: #15803d;
+  --status-bg: rgba(220, 252, 231, 0.7);
+  --status-border: #86efac;
+  --status-strong: #166534;
+}
+
+.storySection,
+.compactSection,
+.miniMetric,
+.riskTile{
+  border-color: var(--status-border);
+  background: var(--status-bg);
+}
+
+.miniMetric.attention,
+.miniMetric.watch,
+.miniMetric.stable{
+  background: #fff;
+}
+
+.riskTile.attention,
+.riskTile.watch,
+.riskTile.stable{
+  background: #ffffff;
+}
+
+/* The report pane is a narrow dashboard column, so dynamic report sections
+   must use a single-column composition even on desktop widths. */
+#stepDecrypt .dynamicReportTop,
+#stepDecrypt .storySectionStack,
+#stepDecrypt .compactSectionGrid{
+  grid-template-columns: 1fr;
+}
+
+#stepDecrypt .summaryHead,
+#stepDecrypt .storySectionHead,
+#stepDecrypt .compactSectionHead{
+  align-items: flex-start;
+}
+
+#stepDecrypt .storySectionHead{
+  flex-direction: column;
+}
+
+#stepDecrypt .sourceTags{
+  justify-content: flex-start;
+  width: 100%;
+}
+
+#stepDecrypt .storySectionBody{
+  grid-template-columns: 1fr;
+}
+
+#stepDecrypt .story-integrated_risk .storySectionBody{
+  grid-template-columns: minmax(0, 1.15fr) minmax(128px, .85fr);
+  align-items: stretch;
+}
+
+#stepDecrypt .story-integrated_risk .storyMetrics{
+  grid-template-columns: 1fr;
+  align-content: stretch;
+}
+
+#stepDecrypt .story-integrated_risk .miniMetric{
+  min-height: 0;
+}
+
+#stepDecrypt .storyChart svg,
+#stepDecrypt .compactChart svg,
+#stepDecrypt .sectionSvg svg{
+  max-width: 100%;
+  height: 150px;
+}
+
+#stepDecrypt .storyChart,
+#stepDecrypt .compactChart{
+  min-width: 0;
+}
+
+#stepDecrypt .compactSectionHead{
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+#stepDecrypt .compactSectionHead span{
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+#stepDecrypt .compactSectionGrid{
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 6px;
+  align-items: stretch;
+}
+
+#stepDecrypt .compact-mobility{
+  grid-column: 1;
+  grid-row: 1;
+}
+
+#stepDecrypt .compact-medical_screening{
+  grid-column: 1;
+  grid-row: 2;
+}
+
+#stepDecrypt .compact-activity{
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+#stepDecrypt .compact-activity .compactChart{
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#stepDecrypt .compactSection{
+  padding: 8px;
+  gap: 6px;
+  border-radius: 12px;
+}
+
+#stepDecrypt .compactSectionHead{
+  gap: 4px;
+}
+
+#stepDecrypt .compactSectionHead strong{
+  font-size: 11px;
+  line-height: 1.15;
+}
+
+#stepDecrypt .compactSectionHead span{
+  font-size: 9px;
+  line-height: 1.25;
+}
+
+#stepDecrypt .compactChart{
+  padding: 6px;
+  border-radius: 10px;
+}
+
+#stepDecrypt .compactChart svg,
+#stepDecrypt .compactChart .sectionSvg svg{
+  height: 82px;
+}
+
+#stepDecrypt .compactChart .sectionSvg{
+  min-height: 82px;
+}
+
+#stepDecrypt .compactChart .legend{
+  display: none;
+}
+
+#stepDecrypt .compactChart .riskTileGrid{
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin-top: 0;
+}
+
+#stepDecrypt .compactChart .riskTile{
+  min-height: 58px;
+  padding: 6px;
+  gap: 3px;
+}
+
+#stepDecrypt .compactChart .riskTile strong{
+  font-size: 15px;
+}
+
+#stepDecrypt .compactStability{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 82px;
+  gap: 8px;
+}
+
+#stepDecrypt .compactStabilityScore{
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: 0;
+  color: #0f172a;
+}
+
+#stepDecrypt .compactStabilityTrack{
+  height: 12px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+#stepDecrypt .compactStabilityTrack i{
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563eb, #22c55e);
+}
+
+#stepDecrypt .compactStabilityMeta{
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+#stepDecrypt .compact-activity .compactChart svg{
+  width: 185px;
+  height: 174px;
+  flex: 0 0 174px;
+}
+
+#stepDecrypt .compact-activity .compactChart .legend{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+#stepDecrypt .compact-activity .compactLegend{
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.2;
+  text-align: left;
+  flex: 0 0 auto;
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+#stepDecrypt .compact-activity .compactLegendItem{
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  min-width: 0;
+  padding: 3px 4px;
+  border: 1px solid rgba(230, 232, 239, 0.85);
+  border-radius: 6px;
+  background: #ffffff;
+  white-space: nowrap;
+}
+
+#stepDecrypt .compact-activity .compactLegendItem strong{
+  color: #0f172a;
+  font-weight: 850;
+}
+
+#stepDecrypt .compact-activity .donutWrap{
+  width: 100%;
+  min-height: 108px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+#stepDecrypt .compact-activity .legendItem{
+  padding: 2px 3px;
+  gap: 3px;
+  border-radius: 6px;
+  font-size: 7.5px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+#stepDecrypt .compact-activity .legendDot{
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+}
+
+#stepDecrypt .riskTileGrid{
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#stepDecrypt .recoveryRow{
+  grid-template-columns: 96px minmax(0, 1fr) 34px;
+}
+
+#stepDecrypt .integratedSummary .chip,
+#stepDecrypt .legendItem,
+#stepDecrypt .sourceTag{
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* Responsive: stack dynamic report grids and section body */
+@media (max-width: 920px){
+  .dynamicReportTop{
+    grid-template-columns: 1fr;
+  }
+  .storySectionStack{
+    grid-template-columns: 1fr;
+  }
+  .storySectionBody{
+    grid-template-columns: 1fr;
+  }
+  .storyMetrics,
+  .compactSectionGrid,
+  .riskTileGrid{
+    grid-template-columns: 1fr;
+  }
+  .reportGrid{
+    grid-template-columns: 1fr;
+  }
+  .chartRow{
+    grid-template-columns: 1fr;
+  }
+  .compactSectionHead{
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .compactSectionHead span{
+    white-space: normal;
+  }
+}
 
 /* Responsive: stack tiles */
 @media (max-width: 1180px){

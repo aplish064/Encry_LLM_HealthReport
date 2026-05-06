@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Secure Multimodal HE + LLM Demo</title>
-  <link rel="stylesheet" href="./assets/css/styles.css?v=34"/>
+  <link rel="stylesheet" href="./assets/css/styles.css?v=50"/>
   <link rel="stylesheet" href="./assets/css/enhancement.css?v=15"/>
 </head>
 <body>
@@ -15,9 +15,9 @@
         <p>Encoding-decoding multimodal inference dashboard</p>
       </div>
       <ol class="stepper" aria-label="Workflow steps">
-        <li class="step active" data-step="select"><span>1</span>Select Modalities</li>
-        <li class="step" data-step="model"><span>2</span>Model Cluster</li>
-        <li class="step" data-step="privacy"><span>3</span>Privacy Protection</li>
+        <li class="step active" data-step="select"><span>1</span>Select Medical Data</li>
+        <li class="step" data-step="model"><span>2</span>Local Encoders</li>
+        <li class="step" data-step="privacy"><span>3</span>Shuffle</li>
         <li class="step" data-step="report"><span>4</span>Report</li>
       </ol>
       <button class="analyze-btn primary-action" id="analyzeBtn" disabled>Run Analysis</button>
@@ -27,7 +27,7 @@
       <aside class="panel panel-modalities workflow-panel active-panel" id="stepUpload">
         <div class="panel-head">
           <div>
-            <h2>Select Modalities</h2>
+            <h2>Select Medical Data</h2>
             <p>Choose multimodal data sources for encrypted health inference.</p>
           </div>
           <div class="panel-meta">
@@ -57,8 +57,8 @@
         <section class="panel panel-models workflow-panel" id="stepDispatch">
           <div class="panel-head">
             <div>
-              <h2>Prediction Model Cluster</h2>
-              <p>Selected modalities are dispatched to specialized encrypted inference tools.</p>
+              <h2>Multimodal Data Encoders</h2>
+              <p>Selected medical data are dispatched to specialized local encoders.</p>
             </div>
             <span class="pill" id="tDispatch">—</span>
           </div>
@@ -74,8 +74,8 @@
                 <div class="edgeText">dispatch</div>
               </div>
               <div class="flowNode">
-                <img class="clusterIcon" src="./assets/icons/model.png" alt="Model cluster" onerror="this.style.display='none'"/>
-                <div class="flowLabel">Multiple tools</div>
+                <img class="clusterIcon" src="./assets/icons/model.png" alt="Local encoders" onerror="this.style.display='none'"/>
+                <div class="flowLabel">Local encoders</div>
               </div>
             </div>
             <div class="clusterWrap">
@@ -89,14 +89,14 @@
             </details>
           </div>
           <div class="spinnerOverlay" id="spinDispatch">
-            <div class="spinner"></div><div class="spinText">Encrypting + dispatching + running HE tools…</div>
+            <div class="spinner"></div><div class="spinText">Encoding + dispatching to local encoders...</div>
           </div>
         </section>
 
         <section class="panel panel-privacy workflow-panel" id="stepProtect">
           <div class="panel-head">
             <div>
-              <h2>Shuffle Privacy Protection</h2>
+              <h2>Shuffle</h2>
             </div>
             <span class="pill" id="tProtect">—</span>
           </div>
@@ -154,8 +154,8 @@
     </section>
   </main>
 
-  <script src="./assets/js/modalityCards.js?v=19"></script>
-  <script src="./assets/js/modality-selector.js?v=34"></script>
-  <script src="./assets/js/app.js?v=43"></script>
+  <script src="./assets/js/modalityCards.js?v=20"></script>
+  <script src="./assets/js/modality-selector.js?v=36"></script>
+  <script src="./assets/js/app.js?v=49"></script>
 </body>
 </html>

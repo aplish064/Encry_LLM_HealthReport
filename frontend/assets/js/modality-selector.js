@@ -25,8 +25,8 @@ class ModalitySelector {
       this.renderCards();
       this.attachEventListeners();
 
-      // Initialize Step 2 model cluster (show all 10 models, dimmed by default)
-      console.log('🔵 Initializing model cluster');
+      // Initialize Step 2 local encoders (show all 10 encoders, dimmed by default)
+      console.log('🔵 Initializing local encoders');
       this.updateModelCluster();
       console.log('✅ ModalitySelector initialization complete');
     } catch (error) {
@@ -360,7 +360,7 @@ class ModalitySelector {
   }
 
   updateModelCluster() {
-    // 根据选中的模态更新Step 2的Homomorphic Prediction Model Cluster
+    // 根据选中的数据更新Step 2的local encoders
     // 始终显示所有10个模型，选中的高亮(active)，未选中的变暗(inactive)
     const clusterGrid = document.getElementById('modelCluster');
     if (!clusterGrid) {
@@ -436,7 +436,7 @@ class ModalitySelector {
     // 重置结果标题
     const resultsTitle = document.getElementById('resultsTitle');
     if (resultsTitle) {
-      resultsTitle.textContent = `Key results (analyzing ${this.selectedModalities.size} modalities...)`;
+      resultsTitle.textContent = `Key results (analyzing ${this.selectedModalities.size} data sources...)`;
     }
 
     const selectedList = Array.from(this.selectedModalities).join(',');
@@ -894,9 +894,7 @@ class ModalitySelector {
       const resultsTitle = document.getElementById('resultsTitle');
       if (resultsTitle) {
         if (s3.results && s3.results.length > 0) {
-          const count = s3.results.length;
-          const modalityNames = s3.results.map(r => r.input_modality).join(', ');
-          resultsTitle.textContent = `Key results (${count} protected modalities: ${modalityNames})`;
+          resultsTitle.textContent = 'Key results';
           console.log(`✅ Results title updated: ${resultsTitle.textContent}`);
         } else {
           resultsTitle.textContent = 'Key results (no data)';
