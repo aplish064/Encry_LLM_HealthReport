@@ -1,0 +1,269 @@
+<h2>Shuffle Privacy Pipeline Animation Direction</h2>
+<p class="subtitle">Pick the visual narrative that best explains: candidate pool -> shuffle -> masking -> protected output.</p>
+
+<style>
+  .pipeline-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+  .pipeline-card {
+    border: 2px solid #d7dde8;
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color .18s ease, transform .18s ease;
+  }
+  .pipeline-card:hover {
+    border-color: #2563eb;
+    transform: translateY(-2px);
+  }
+  .pipeline-preview {
+    height: 270px;
+    padding: 18px;
+    background: #f8fbff;
+    border-bottom: 1px solid #e6eaf2;
+    position: relative;
+    overflow: hidden;
+  }
+  .pipeline-body {
+    padding: 14px 16px 16px;
+  }
+  .pipeline-body h3 {
+    margin: 0 0 6px;
+  }
+  .pipeline-body p {
+    margin: 0;
+    color: #5b6474;
+    line-height: 1.4;
+  }
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 100%;
+  }
+  .flow-box {
+    flex: 1;
+    min-width: 0;
+    border: 1px solid #d8e1ef;
+    border-radius: 8px;
+    background: #fff;
+    padding: 9px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: #1f2937;
+  }
+  .flow-arrow {
+    color: #7b8494;
+    font-weight: 900;
+  }
+  .raw-card {
+    height: 46px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    background: #fff;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .mini-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .mini-token {
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border-radius: 6px;
+    background: #eaf2ff;
+    color: #1d4ed8;
+    font-size: 9px;
+    font-weight: 900;
+  }
+  .shuffle-box {
+    height: 76px;
+    border: 1px dashed rgba(37, 99, 235, .45);
+    border-radius: 8px;
+    background: rgba(37, 99, 235, .06);
+    position: relative;
+    overflow: hidden;
+  }
+  .shuffle-box::before,
+  .shuffle-box::after {
+    content: "";
+    position: absolute;
+    left: -25%;
+    width: 62%;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, #2563eb, transparent);
+    animation: sweep 1.7s ease-in-out infinite;
+  }
+  .shuffle-box::before { top: 25px; }
+  .shuffle-box::after { top: 46px; animation-delay: .35s; }
+  .protected {
+    height: 54px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(31, 157, 85, .35);
+    border-radius: 8px;
+    background: rgba(31, 157, 85, .08);
+    color: #15803d;
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .stage-stack {
+    display: grid;
+    gap: 10px;
+  }
+  .stage-item {
+    display: grid;
+    grid-template-columns: 25px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    padding: 9px;
+    border: 1px solid #d8e1ef;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .stage-dot {
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    background: #eaf2ff;
+    color: #2563eb;
+    font-size: 10px;
+    font-weight: 900;
+  }
+  .privacy-map {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    height: 100%;
+    align-content: center;
+  }
+  .map-panel {
+    min-height: 88px;
+    border: 1px solid #d8e1ef;
+    border-radius: 8px;
+    background: #fff;
+    padding: 10px;
+    font-size: 11px;
+    font-weight: 900;
+    color: #334155;
+  }
+  .link-line {
+    height: 7px;
+    margin-top: 12px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ef4444, #2563eb, #22c55e);
+    animation: shrink 2s ease-in-out infinite alternate;
+  }
+  .mask-chip {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 10px;
+  }
+  @keyframes sweep {
+    from { transform: translateX(0); opacity: .25; }
+    50% { opacity: 1; }
+    to { transform: translateX(220%); opacity: .25; }
+  }
+  @keyframes shrink {
+    from { width: 100%; }
+    to { width: 34%; }
+  }
+  @media (max-width: 980px) {
+    .pipeline-options { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="pipeline-options">
+  <div class="pipeline-card" data-choice="a-linear-conveyor" onclick="toggleSelect(this)">
+    <div class="pipeline-preview">
+      <div class="flow-row">
+        <div class="flow-box">
+          Raw
+          <div class="raw-card">Encrypted Profile</div>
+        </div>
+        <div class="flow-arrow">></div>
+        <div class="flow-box">
+          Pool
+          <div class="mini-grid">
+            <div class="mini-token">C1</div><div class="mini-token">C2</div><div class="mini-token">C3</div>
+            <div class="mini-token">C4</div><div class="mini-token">C5</div><div class="mini-token">C6</div>
+          </div>
+        </div>
+        <div class="flow-arrow">></div>
+        <div class="flow-box">
+          Shuffle
+          <div class="shuffle-box"></div>
+        </div>
+        <div class="flow-arrow">></div>
+        <div class="flow-box">
+          Output
+          <div class="protected">Protected</div>
+        </div>
+      </div>
+    </div>
+    <div class="pipeline-body">
+      <h3>A. Linear Conveyor</h3>
+      <p>Best for a quick demo: every stage is visible left-to-right, with tokens moving through a mixer into the final report.</p>
+    </div>
+  </div>
+
+  <div class="pipeline-card" data-choice="b-stage-timeline" onclick="toggleSelect(this)">
+    <div class="pipeline-preview">
+      <div class="stage-stack">
+        <div class="stage-item"><div class="stage-dot">1</div><div>Generate synthetic candidate neighbors</div></div>
+        <div class="stage-item"><div class="stage-dot">2</div><div>Shuffle candidate order in a mixing chamber</div></div>
+        <div class="stage-item"><div class="stage-dot">3</div><div>Mask direct linkage to raw model outputs</div></div>
+        <div class="stage-item"><div class="stage-dot">4</div><div>Select protected report output</div></div>
+      </div>
+    </div>
+    <div class="pipeline-body">
+      <h3>B. Stage Timeline</h3>
+      <p>Best for explaining the method: the active step pulses while the panel below shows the corresponding visual state.</p>
+    </div>
+  </div>
+
+  <div class="pipeline-card" data-choice="c-linkage-meter" onclick="toggleSelect(this)">
+    <div class="pipeline-preview">
+      <div class="privacy-map">
+        <div class="map-panel">
+          Raw result linkage
+          <div class="link-line"></div>
+          <span class="mask-chip">Before: identifiable path</span>
+        </div>
+        <div class="map-panel">
+          Protected output
+          <div class="mini-grid">
+            <div class="mini-token">C7</div><div class="mini-token">C2</div><div class="mini-token">C9</div>
+            <div class="mini-token">C4</div><div class="mini-token">C1</div><div class="mini-token">C6</div>
+          </div>
+          <span class="mask-chip">After: reduced linkage</span>
+        </div>
+      </div>
+    </div>
+    <div class="pipeline-body">
+      <h3>C. Linkage Reduction</h3>
+      <p>Best for a privacy-heavy talk: the visual focus is the shrinking direct link between raw profile and report.</p>
+    </div>
+  </div>
+</div>

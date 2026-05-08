@@ -1,7 +1,9 @@
 // frontend/assets/js/app.js
 const API_BASE = (
   window.API_BASE ||
-  `${window.location.protocol}//${window.location.hostname}:8082`
+  (window.location.port === "8001"
+    ? `${window.location.protocol}//${window.location.hostname}:8082`
+    : "")
 );
 
 const $ = (id) => document.getElementById(id);

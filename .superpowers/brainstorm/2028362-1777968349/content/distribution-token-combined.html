@@ -1,0 +1,102 @@
+<h2>合并方案：100 份伪造数据分布 + 后端隐藏令牌</h2>
+<p class="subtitle">这版把“分布遮蔽”和“目标数据抽取”放在同一个流程里：观察者看到分布，后端用 token 找回真实记录。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Final Direction: Distribution Masking With Backend Token Lookup</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:.95fr 1.35fr 1.05fr .95fr;gap:14px;align-items:stretch">
+      <div style="border:1px solid #d7dfec;border-radius:10px;padding:13px;background:#fbfdff">
+        <h3 style="margin:0 0 9px">1. 真实同态推理结果</h3>
+        <div style="display:grid;gap:8px">
+          <div style="border-radius:8px;background:#eef6ff;padding:8px 10px"><strong>ECG</strong><br><span style="color:#536176">score bucket 75-80</span></div>
+          <div style="border-radius:8px;background:#eef6ff;padding:8px 10px"><strong>Sleep</strong><br><span style="color:#536176">score bucket 90-95</span></div>
+          <div style="border-radius:8px;background:#eef6ff;padding:8px 10px"><strong>Vitals</strong><br><span style="color:#536176">BP slightly elevated</span></div>
+        </div>
+        <div style="margin-top:12px;border:1px solid #bfdbfe;border-radius:9px;padding:9px;background:#eff6ff">
+          <div style="font-size:12px;color:#475569">Backend internal</div>
+          <div style="font-family:monospace;color:#1d4ed8;font-size:12px;margin-top:4px">token = H(seed, real_id, nonce)</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #d7dfec;border-radius:10px;padding:13px;background:#fff">
+        <h3 style="margin:0 0 9px">2. 生成 100 份伪造数据库分布</h3>
+        <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:5px;align-items:end;height:78px;margin:6px 0 10px">
+          <span style="height:18px;border-radius:4px;background:#22c55e"></span>
+          <span style="height:26px;border-radius:4px;background:#22c55e"></span>
+          <span style="height:39px;border-radius:4px;background:#22c55e"></span>
+          <span style="height:58px;border-radius:4px;background:#22c55e"></span>
+          <span style="height:72px;border-radius:4px;background:#f59e0b"></span>
+          <span style="height:63px;border-radius:4px;background:#f59e0b"></span>
+          <span style="height:48px;border-radius:4px;background:#f59e0b"></span>
+          <span style="height:31px;border-radius:4px;background:#ef4444"></span>
+          <span style="height:19px;border-radius:4px;background:#ef4444"></span>
+          <span style="height:10px;border-radius:4px;background:#ef4444"></span>
+        </div>
+        <div style="display:flex;gap:8px;font-size:12px;color:#536176;margin-bottom:8px">
+          <span style="display:inline-flex;align-items:center;gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#22c55e;display:inline-block"></i>low</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#f59e0b;display:inline-block"></i>attention</span>
+          <span style="display:inline-flex;align-items:center;gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#ef4444;display:inline-block"></i>elevated</span>
+        </div>
+        <div style="position:relative;height:118px;border:1px solid #e2e8f0;border-radius:10px;background:linear-gradient(90deg,#ecfdf5,#fffbeb,#fef2f2);overflow:hidden">
+          <div style="position:absolute;left:6%;top:62%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:11%;top:43%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:18%;top:55%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:25%;top:34%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:32%;top:70%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:39%;top:49%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:47%;top:58%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:56%;top:41%;width:8px;height:8px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 8px rgba(37,99,235,.16)"></div>
+          <div style="position:absolute;left:65%;top:64%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:72%;top:46%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:82%;top:57%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:90%;top:38%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:56%;top:12%;transform:translateX(-45%);padding:3px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:12px">target hidden in distribution</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #d7dfec;border-radius:10px;padding:13px;background:#fbfdff">
+        <h3 style="margin:0 0 9px">3. 混洗映射与 token 查表</h3>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px;font-size:12px">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;text-align:center">anon_21</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;text-align:center">anon_04</div>
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;padding:8px;text-align:center;color:#1d4ed8">anon_58</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;text-align:center">anon_73</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;text-align:center">anon_12</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:8px;text-align:center">anon_89</div>
+        </div>
+        <div style="margin-top:12px;border:1px solid #bfdbfe;border-radius:9px;padding:10px;background:#dbeafe">
+          <strong>Backend lookup</strong>
+          <div style="font-family:monospace;color:#1d4ed8;font-size:12px;margin-top:5px">real_record = token_map[token]</div>
+        </div>
+        <p style="font-size:13px;color:#536176;margin:10px 0 0">前端只看到匿名分布和 anon ID；token_map 不出后端。</p>
+      </div>
+
+      <div style="border:1px solid #d7dfec;border-radius:10px;padding:13px;background:#fbfdff">
+        <h3 style="margin:0 0 9px">4. 分桶摘要给非可信 LLM</h3>
+        <div style="display:grid;gap:8px">
+          <div style="border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:8px"><strong>fall risk</strong><br><span style="color:#536176">20-25%</span></div>
+          <div style="border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:8px"><strong>BP</strong><br><span style="color:#536176">slightly elevated</span></div>
+          <div style="border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:8px"><strong>Sleep</strong><br><span style="color:#536176">good</span></div>
+        </div>
+        <p style="font-size:13px;color:#536176;margin:10px 0 0">报告图表仍由后端真实结构化报告渲染；LLM 只生成文字结论。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="combined-accept" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>按这个合并方案实现</h3>
+      <p>隐私板块主视觉改成分布图，并明确展示后端 token 生成与查表过程。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="token-less-prominent" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>弱化 token，突出分布</h3>
+      <p>token 作为小注释，避免流程显得过技术化。</p>
+    </div>
+  </div>
+</div>

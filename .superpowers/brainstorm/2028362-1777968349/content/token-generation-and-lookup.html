@@ -1,0 +1,82 @@
+<h2>隐藏选择令牌：生成与调用草图</h2>
+<p class="subtitle">令牌要表达为“后端内部索引机制”，不是前端可见密钥。前端只看到分布、匿名 ID、分桶摘要。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Token Flow: Backend Internal Only</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:16px;align-items:stretch">
+      <div style="border:1px solid #d7dfec;border-radius:10px;padding:14px;background:#fbfdff">
+        <h3 style="margin:0 0 10px">1. 生成令牌</h3>
+        <div style="border:1px solid #bfdbfe;border-radius:9px;padding:10px;background:#eff6ff">
+          <div style="font-size:12px;color:#475569">Backend creates</div>
+          <div style="font-family:monospace;font-size:15px;margin-top:4px;color:#1d4ed8">token = H(session_seed, real_id, nonce)</div>
+        </div>
+        <div style="margin-top:12px;padding:10px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0">
+          <strong>绑定真实记录</strong>
+          <p style="margin:6px 0 0;color:#536176;font-size:13px">token 只在后端内存中绑定真实同态推理记录。</p>
+        </div>
+      </div>
+
+      <div style="border:1px solid #d7dfec;border-radius:10px;padding:14px;background:#fff">
+        <h3 style="margin:0 0 10px">2. 插入 100 份伪造数据库并混洗</h3>
+        <div style="height:150px;border:1px solid #e2e8f0;border-radius:10px;background:linear-gradient(90deg,#ecfdf5,#fffbeb,#fef2f2);position:relative;overflow:hidden">
+          <div style="position:absolute;left:5%;top:60%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:9%;top:42%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:14%;top:50%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:20%;top:65%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:27%;top:40%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:34%;top:55%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:41%;top:45%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:49%;top:63%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:58%;top:43%;width:8px;height:8px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 7px rgba(37,99,235,.16)"></div>
+          <div style="position:absolute;left:66%;top:56%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:75%;top:48%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:83%;top:64%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:90%;top:38%;width:6px;height:6px;border-radius:50%;background:#94a3b8"></div>
+          <div style="position:absolute;left:58%;top:18%;transform:translateX(-45%);padding:4px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:12px">token-bound target</div>
+        </div>
+        <div style="margin-top:10px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:12px">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:7px;text-align:center">anon_21</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:7px;text-align:center">anon_04</div>
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;padding:7px;text-align:center;color:#1d4ed8">anon_58</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:7px;text-align:center">anon_73</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #d7dfec;border-radius:10px;padding:14px;background:#fbfdff">
+        <h3 style="margin:0 0 10px">3. 调用令牌查回目标数据</h3>
+        <div style="display:grid;gap:10px">
+          <div style="border:1px solid #e2e8f0;border-radius:9px;padding:9px;background:#fff">
+            <strong>Frontend sees</strong>
+            <p style="font-size:13px;color:#536176;margin:5px 0 0">分布图 + 匿名 ID + 分桶摘要</p>
+          </div>
+          <div style="border:1px solid #bfdbfe;border-radius:9px;padding:9px;background:#dbeafe">
+            <strong>Backend lookup</strong>
+            <p style="font-family:monospace;font-size:12px;margin:5px 0;color:#1d4ed8">selected = map[token]</p>
+          </div>
+          <div style="border:1px solid #e2e8f0;border-radius:9px;padding:9px;background:#fff">
+            <strong>LLM receives</strong>
+            <p style="font-size:13px;color:#536176;margin:5px 0 0">bucketed summary, not token, not precise raw data</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="token-visible-in-animation" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>动画中显示“令牌生成 → 令牌查表”</h3>
+      <p>技术过程最清楚。令牌图标显示在后端区域，不进入前端分布图。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="token-subtle" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>令牌只作为小注释</h3>
+      <p>界面更简洁，但“怎么挑出目标数据”的原理不如 A 清楚。</p>
+    </div>
+  </div>
+</div>

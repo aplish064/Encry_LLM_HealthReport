@@ -23,6 +23,7 @@ import matplotlib.patches as mpatches
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from privacy_shuffle import (
     build_anonymous_database,
@@ -33,6 +34,7 @@ from privacy_shuffle import (
 )
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
 DATA_PATHS = {
     "UWB": os.path.join(BASE_DIR, "test_data", "uwb_sample.txt"),
@@ -2426,6 +2428,8 @@ async def run_cycle(selected_modalities: Optional[str] = None):
         "data_source": "UT_HAR dataset",
         "llm_provider": "ZhipuAI"
     }
+
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
 if __name__ == "__main__":
     import uvicorn

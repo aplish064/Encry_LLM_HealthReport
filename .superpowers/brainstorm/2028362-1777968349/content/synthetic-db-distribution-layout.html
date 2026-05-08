@@ -1,0 +1,76 @@
+<h2>伪造数据库隐私流程草图</h2>
+<p class="subtitle">重点从“展示少量匿名记录”改为“展示 100 份伪造数据的分布，以及目标数据如何被隐藏定位”。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Recommended Layout: Distribution First</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:1.1fr 1.35fr 1fr;gap:18px;align-items:stretch">
+      <div style="border:1px solid #d7dfec;border-radius:10px;padding:14px;background:#fbfdff">
+        <h3 style="margin:0 0 10px">1. 真实同态推理结果</h3>
+        <div style="display:grid;gap:8px">
+          <div style="height:38px;border-radius:8px;background:#eef6ff;padding:8px 10px"><strong>ECG</strong> score bucket 75-80</div>
+          <div style="height:38px;border-radius:8px;background:#eef6ff;padding:8px 10px"><strong>Sleep</strong> score bucket 90-95</div>
+          <div style="height:38px;border-radius:8px;background:#eef6ff;padding:8px 10px"><strong>BP</strong> slightly elevated</div>
+        </div>
+        <p style="font-size:13px;color:#536176;margin:12px 0 0">精确值留在后端，LLM 只收到分桶摘要。</p>
+      </div>
+
+      <div style="border:1px solid #d7dfec;border-radius:10px;padding:14px;background:#ffffff">
+        <h3 style="margin:0 0 10px">2. 生成 100 份伪造数据库分布</h3>
+        <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:5px;margin:8px 0 12px">
+          <span style="height:15px;border-radius:4px;background:#22c55e"></span>
+          <span style="height:22px;border-radius:4px;background:#22c55e"></span>
+          <span style="height:34px;border-radius:4px;background:#22c55e"></span>
+          <span style="height:48px;border-radius:4px;background:#22c55e"></span>
+          <span style="height:64px;border-radius:4px;background:#f59e0b"></span>
+          <span style="height:55px;border-radius:4px;background:#f59e0b"></span>
+          <span style="height:39px;border-radius:4px;background:#f59e0b"></span>
+          <span style="height:24px;border-radius:4px;background:#ef4444"></span>
+          <span style="height:14px;border-radius:4px;background:#ef4444"></span>
+          <span style="height:8px;border-radius:4px;background:#ef4444"></span>
+        </div>
+        <div style="position:relative;height:90px;border:1px solid #e2e8f0;border-radius:10px;background:linear-gradient(90deg,#ecfdf5,#fffbeb,#fef2f2);overflow:hidden">
+          <div style="position:absolute;left:8%;top:54%;width:7px;height:7px;border-radius:50%;background:#64748b"></div>
+          <div style="position:absolute;left:13%;top:45%;width:7px;height:7px;border-radius:50%;background:#64748b"></div>
+          <div style="position:absolute;left:19%;top:62%;width:7px;height:7px;border-radius:50%;background:#64748b"></div>
+          <div style="position:absolute;left:28%;top:40%;width:7px;height:7px;border-radius:50%;background:#64748b"></div>
+          <div style="position:absolute;left:35%;top:56%;width:7px;height:7px;border-radius:50%;background:#64748b"></div>
+          <div style="position:absolute;left:43%;top:48%;width:7px;height:7px;border-radius:50%;background:#64748b"></div>
+          <div style="position:absolute;left:52%;top:35%;width:7px;height:7px;border-radius:50%;background:#64748b"></div>
+          <div style="position:absolute;left:58%;top:60%;width:7px;height:7px;border-radius:50%;background:#2563eb;box-shadow:0 0 0 5px rgba(37,99,235,.16)"></div>
+          <div style="position:absolute;left:66%;top:44%;width:7px;height:7px;border-radius:50%;background:#64748b"></div>
+          <div style="position:absolute;left:75%;top:50%;width:7px;height:7px;border-radius:50%;background:#64748b"></div>
+          <div style="position:absolute;left:84%;top:38%;width:7px;height:7px;border-radius:50%;background:#64748b"></div>
+        </div>
+        <p style="font-size:13px;color:#536176;margin:10px 0 0">视觉展示分布轮廓、风险桶比例、目标记录在分布中的位置；不展示 100 张卡片。</p>
+      </div>
+
+      <div style="border:1px solid #d7dfec;border-radius:10px;padding:14px;background:#fbfdff">
+        <h3 style="margin:0 0 10px">3. 隐藏定位与抽取</h3>
+        <div style="display:grid;gap:9px">
+          <div style="border:1px solid #dbeafe;border-radius:9px;padding:9px;background:#eff6ff"><strong>插入</strong><br><span style="color:#536176">真实记录混入 100 份伪造数据库</span></div>
+          <div style="border:1px solid #dbeafe;border-radius:9px;padding:9px;background:#eff6ff"><strong>混洗</strong><br><span style="color:#536176">匿名 ID 重排，观察者只见分布</span></div>
+          <div style="border:1px solid #bfdbfe;border-radius:9px;padding:9px;background:#dbeafe"><strong>令牌定位</strong><br><span style="color:#1d4ed8">后端 hidden token 找回目标数据</span></div>
+          <div style="border:1px solid #d7dfec;border-radius:9px;padding:9px;background:#fff"><strong>分桶摘要</strong><br><span style="color:#536176">交给非可信 LLM 生成文字结论</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="distribution-first" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>分布优先布局</h3>
+      <p>主视觉是 100 份伪造数据库的分布图；隐藏目标点只以高亮或脉冲显示。推荐。</p>
+    </div>
+  </div>
+  <div class="option" data-choice="table-plus-distribution" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>分布 + 抽样表布局</h3>
+      <p>上方显示分布，下方显示 8-12 条抽样匿名记录，兼顾可解释性但更拥挤。</p>
+    </div>
+  </div>
+</div>

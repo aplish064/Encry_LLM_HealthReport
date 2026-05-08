@@ -42,7 +42,9 @@ class ModalitySelector {
       // 使用全局API_BASE（在app.js中定义）
       const apiBase = (typeof API_BASE !== 'undefined')
         ? API_BASE
-        : `${window.location.protocol}//${window.location.hostname}:8082`;
+        : (window.location.port === "8001"
+          ? `${window.location.protocol}//${window.location.hostname}:8082`
+          : "");
       const response = await this.fetchWithTimeout(`${apiBase}/api/modalities`, {
         method: 'GET',
         headers: {
@@ -77,7 +79,9 @@ class ModalitySelector {
     // 加载每个模态的缩略图预览
     const apiBase = (typeof API_BASE !== 'undefined')
       ? API_BASE
-      : `${window.location.protocol}//${window.location.hostname}:8082`;
+      : (window.location.port === "8001"
+        ? `${window.location.protocol}//${window.location.hostname}:8082`
+        : "");
 
     console.log('Loading modality thumbnails...');
 
@@ -471,7 +475,9 @@ class ModalitySelector {
       this.updateProgress(20, `Dispatching encrypted inference... (${attempt}/${this.maxRetries})`);
       const apiBase = (typeof API_BASE !== 'undefined')
         ? API_BASE
-        : `${window.location.protocol}//${window.location.hostname}:8082`;
+        : (window.location.port === "8001"
+          ? `${window.location.protocol}//${window.location.hostname}:8082`
+          : "");
 
       if (typeof setWorkflowStep === 'function') {
         setWorkflowStep('model');
