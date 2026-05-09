@@ -13,6 +13,7 @@ const WORKFLOW_PANEL_BY_STEP = {
   model: "stepDispatch",
   privacy: "stepProtect",
   report: "stepDecrypt",
+  llm: "stepProtect",
 };
 
 function setWorkflowStep(stepName) {
@@ -29,6 +30,42 @@ function setWorkflowStep(stepName) {
 
   const activePanel = $(activePanelId);
   if (activePanel) activePanel.classList.add("active-panel");
+}
+
+function renderLlmPromptRoute() {
+  return `
+    <div class="llmPromptRoute" id="llmPromptRoute">
+      <div class="llmRouteArrow" aria-hidden="true">
+        <span class="llmRouteStem"></span>
+        <span class="llmRouteArrowHead"></span>
+      </div>
+      <div class="llm-icon-group llmPromptIconGroup" id="llmIconGroup" role="group" aria-label="Target LLM">
+        <button class="llm-icon-option active" type="button" data-llm-provider="qwen" data-llm-label="Qwen" aria-pressed="true" title="Qwen">
+          <img src="./assets/icons/qwen-color.svg" alt="Qwen"/>
+        </button>
+        <button class="llm-icon-option" type="button" data-llm-provider="deepseek" data-llm-label="DeepSeek Compatible" aria-pressed="false" title="DeepSeek Compatible">
+          <img src="./assets/icons/deepseek-color.svg" alt="DeepSeek Compatible"/>
+        </button>
+        <button class="llm-icon-option" type="button" data-llm-provider="zhipu" data-llm-label="ZhipuAI" aria-pressed="false" title="ZhipuAI">
+          <img src="./assets/icons/zhipu-color.svg" alt="ZhipuAI"/>
+        </button>
+        <button class="llm-icon-option" type="button" data-llm-provider="kimi" data-llm-label="Kimi" aria-pressed="false" title="Kimi">
+          <img src="./assets/icons/kimi.svg" alt="Kimi"/>
+        </button>
+        <button class="llm-icon-option" type="button" data-llm-provider="minimax" data-llm-label="MiniMax" aria-pressed="false" title="MiniMax">
+          <img src="./assets/icons/minimax-color.svg" alt="MiniMax"/>
+        </button>
+        <button class="llm-icon-option" type="button" data-llm-provider="doubao" data-llm-label="Doubao" aria-pressed="false" title="Doubao">
+          <img src="./assets/icons/doubao-color.svg" alt="Doubao"/>
+        </button>
+        <button class="llm-icon-option" type="button" data-llm-provider="xiaomi-mimo" data-llm-label="Xiaomi MiMo" aria-pressed="false" title="Xiaomi MiMo">
+          <img src="./assets/icons/xiaomimimo.svg" alt="Xiaomi MiMo"/>
+        </button>
+      </div>
+      <div class="route-meta" id="llmRouteMeta">Ready to send to Qwen after shuffle.</div>
+      <button class="confirm-llm-btn" type="button" id="confirmLlmBtn" disabled>Confirm Qwen and generate report</button>
+    </div>
+  `;
 }
 
 function showSpinner(id, show) {
@@ -792,11 +829,12 @@ function renderPrivacyProtection(privacy) {
   ));
   const rawPrompt = safeText(privacy.plaintext_prompt || privacy.llm_prompt, "");
   const plaintextPromptHtml = rawPrompt
-    ? `<details class="cipher-panel reportPromptPanel" open>
+    ? `<details class="cipher-panel reportPromptPanel">
       <summary>Plaintext Prompt (sent to untrusted LLM)</summary>
       <pre class="v">${escHtml(rawPrompt)}</pre>
     </details>`
     : "";
+  const llmPromptRouteHtml = renderLlmPromptRoute();
   const bloodPressureBucket = escHtml(summaryMetrics.blood_pressure || "masked");
   const sleepBucket = escHtml(summaryMetrics.sleep_efficiency || "masked");
   const bucketedSummaryThumb = `
@@ -885,6 +923,7 @@ function renderPrivacyProtection(privacy) {
         <div class="mixerLabel">4. Bucketed summary enters untrusted LLM</div>
         <div class="protectedOutputCard">
           ${plaintextPromptHtml}
+          ${llmPromptRouteHtml}
           ${bucketedSummaryThumb}
         </div>
       </div>

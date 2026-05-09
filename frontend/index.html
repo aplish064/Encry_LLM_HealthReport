@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Secure Multimodal HE + LLM Demo</title>
-  <link rel="stylesheet" href="./assets/css/styles.css?v=50"/>
+  <link rel="stylesheet" href="./assets/css/styles.css?v=58"/>
   <link rel="stylesheet" href="./assets/css/enhancement.css?v=15"/>
 </head>
 <body>
@@ -18,7 +18,8 @@
         <li class="step active" data-step="select"><span>1</span>Select Medical Data</li>
         <li class="step" data-step="model"><span>2</span>Local Encoders</li>
         <li class="step" data-step="privacy"><span>3</span>Shuffle</li>
-        <li class="step" data-step="report"><span>4</span>Report</li>
+        <li class="step" data-step="llm"><span>4</span>Send to LLM</li>
+        <li class="step" data-step="report"><span>5</span>Report</li>
       </ol>
       <button class="analyze-btn primary-action" id="analyzeBtn" disabled>Run Analysis</button>
     </header>
@@ -65,8 +66,7 @@
           <div class="panel-body">
             <div class="flowRow">
               <div class="flowNode">
-                <img class="icon" src="./assets/icons/deepseek.png" onerror="this.style.display='none'"/>
-                <div class="flowLabel">DeepSeek</div>
+                <img class="sense-core-mark" src="./assets/icons/sensecore.png" alt="Sense Core"/>
               </div>
               <div class="flowEdge">
                 <img class="icon small" src="./assets/icons/network.png" onerror="this.style.display='none'"/>
@@ -104,6 +104,7 @@
             <div class="privacyPanel" id="privacyPanel">Select modalities and run analysis to generate the anonymized privacy flow.</div>
           </div>
         </section>
+
       </section>
 
       <section class="panel panel-report workflow-panel" id="stepDecrypt">
@@ -154,8 +155,8 @@
     </section>
   </main>
 
-  <script src="./assets/js/modalityCards.js?v=20"></script>
-  <script src="./assets/js/modality-selector.js?v=37"></script>
-  <script src="./assets/js/app.js?v=50"></script>
+  <script src="./assets/js/modalityCards.js?v=21"></script>
+  <script src="./assets/js/modality-selector.js?v=44"></script>
+  <script src="./assets/js/app.js?v=54"></script>
 </body>
 </html>

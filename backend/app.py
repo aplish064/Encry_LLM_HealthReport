@@ -21,7 +21,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import httpx
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -48,6 +48,7 @@ DATA_PATHS = {
 }
 
 ASSET_USER_DIR = os.path.join(BASE_DIR, "frontend", "assets", "user")
+USER_UPLOAD_DIR = os.path.join(ASSET_USER_DIR, "uploads")
 DEPTH_PNG_PATH = os.path.join(ASSET_USER_DIR, "deep2.png")
 RGB_PNG_PATH = os.path.join(ASSET_USER_DIR, "RGB.png")
 
@@ -98,6 +99,32 @@ MODALITY_NAME_MAP = {
     "血细胞": "Blood"
 }
 
+MODALITY_ID_TO_CANONICAL = {
+    "depth": "Depth",
+    "uwb": "UWB",
+    "imu": "IMU",
+    "csi": "CSI",
+    "rgb": "RGB",
+    "ntu": "NTU",
+    "retina": "Retina",
+    "chest": "Chest",
+    "path": "Path",
+    "blood": "Blood",
+}
+
+MODALITY_CANONICAL_TO_LABEL = {
+    "Depth": "Depth Camera",
+    "UWB": "UWB Radar",
+    "IMU": "IMU Sensor",
+    "CSI": "WiFi CSI",
+    "RGB": "RGB Camera",
+    "NTU": "NTU",
+    "Retina": "Retina",
+    "Chest": "Chest",
+    "Path": "Pathology",
+    "Blood": "Blood",
+}
+
 def normalize_modality_name(name: str) -> str:
     """将模态完整名称转换为后端get_data函数期望的简化名称"""
     return MODALITY_NAME_MAP.get(name, name)
@@ -106,6 +133,68 @@ def normalize_modality_name(name: str) -> str:
 ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY", "")
 ZHIPU_API_URL = os.getenv("ZHIPU_API_URL", "https://open.bigmodel.cn/api/anthropic/v1/messages")
 ZHIPU_MODEL = os.getenv("ZHIPU_MODEL", "claude-3-5-sonnet-20241022")
+
+LLM_PROVIDER_OPTIONS = {
+    "qwen": {
+        "label": "Qwen",
+        "api_key_env": "QWEN_API_KEY",
+        "base_url_env": "QWEN_BASE_URL",
+        "model_env": "QWEN_MODEL",
+        "default_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+        "default_model": "qwen-plus",
+    },
+    "sense-core": {
+        "label": "Sense Core",
+        "api_key_env": "SENSE_CORE_API_KEY",
+        "base_url_env": "SENSE_CORE_BASE_URL",
+        "model_env": "SENSE_CORE_MODEL",
+        "default_base_url": "",
+        "default_model": "sense-chat",
+    },
+    "deepseek": {
+        "label": "DeepSeek",
+        "api_key_env": "DEEPSEEK_API_KEY",
+        "base_url_env": "DEEPSEEK_BASE_URL",
+        "model_env": "DEEPSEEK_MODEL",
+        "default_base_url": "https://api.deepseek.com/chat/completions",
+        "default_model": "deepseek-chat",
+    },
+    "zhipu": {
+        "label": "ZhipuAI",
+    },
+    "kimi": {
+        "label": "Kimi",
+        "api_key_env": "KIMI_API_KEY",
+        "base_url_env": "KIMI_BASE_URL",
+        "model_env": "KIMI_MODEL",
+        "default_base_url": "",
+        "default_model": "kimi-k2",
+    },
+    "minimax": {
+        "label": "MiniMax",
+        "api_key_env": "MINIMAX_API_KEY",
+        "base_url_env": "MINIMAX_BASE_URL",
+        "model_env": "MINIMAX_MODEL",
+        "default_base_url": "",
+        "default_model": "minimax-text-01",
+    },
+    "doubao": {
+        "label": "Doubao",
+        "api_key_env": "DOUBAO_API_KEY",
+        "base_url_env": "DOUBAO_BASE_URL",
+        "model_env": "DOUBAO_MODEL",
+        "default_base_url": "",
+        "default_model": "doubao-pro",
+    },
+    "xiaomi-mimo": {
+        "label": "Xiaomi MiMo",
+        "api_key_env": "XIAOMI_MIMO_API_KEY",
+        "base_url_env": "XIAOMI_MIMO_BASE_URL",
+        "model_env": "XIAOMI_MIMO_MODEL",
+        "default_base_url": "",
+        "default_model": "mimo",
+    },
+}
 
 # 本地编码器配置
 CLUSTER_MODELS = [
@@ -292,6 +381,16 @@ def png_b64_from_file(path: str) -> Optional[str]:
             return result
     except Exception:
         return None
+
+
+def normalize_llm_provider(provider: Optional[str]) -> str:
+    provider_key = str(provider or "zhipu").strip().lower()
+    return provider_key if provider_key in LLM_PROVIDER_OPTIONS else "qwen"
+
+
+def llm_provider_label(provider: Optional[str]) -> str:
+    provider_key = normalize_llm_provider(provider)
+    return LLM_PROVIDER_OPTIONS[provider_key]["label"]
 
 def load_modality_config() -> Dict[str, Any]:
     """Load modality configuration from modality_config.json or return default config.
@@ -1445,6 +1544,46 @@ async def call_zhipu_llm(prompt: str, max_tokens: int = 1024) -> str:
     except Exception as e:
         return f"ZhipuAI call failed, using fallback protected conclusion: {str(e)}"
 
+
+async def call_selected_llm(prompt: str, provider: Optional[str], max_tokens: int = 1024) -> str:
+    """Route the protected prompt to the selected LLM provider when configured."""
+    provider_key = normalize_llm_provider(provider)
+    if provider_key == "zhipu":
+        return await call_zhipu_llm(prompt, max_tokens=max_tokens)
+
+    config = LLM_PROVIDER_OPTIONS[provider_key]
+    label = config["label"]
+    api_key = os.getenv(config["api_key_env"], "")
+    base_url = os.getenv(config["base_url_env"], config["default_base_url"])
+    model = os.getenv(config["model_env"], config["default_model"])
+
+    if not api_key or not base_url:
+        return f"{label} is selected. No API key is configured, so a fallback protected conclusion is returned."
+
+    try:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(base_url, headers=headers, json=payload)
+            response.raise_for_status()
+            result = response.json()
+        choices = result.get("choices") or []
+        if choices:
+            message = choices[0].get("message") or {}
+            content = message.get("content")
+            if content:
+                return str(content)
+        return f"{label} returned success, but response format was unexpected."
+    except Exception as e:
+        return f"{label} call failed, using fallback protected conclusion: {str(e)}"
+
 @app.get("/api/health")
 async def health_check():
     """健康检查"""
@@ -1649,6 +1788,65 @@ async def get_modality_thumbnail(modality: str):
         import traceback
         traceback.print_exc()
         return {"thumbnail": None, "error": str(e)}
+
+
+@app.post("/api/upload_medical_image")
+async def upload_medical_image(payload: Dict[str, Any] = Body(...)):
+    """Accept a browser-selected image and attach it to a modality card."""
+    data_url = str(payload.get("data_url", ""))
+    filename = str(payload.get("filename", "uploaded-image")).strip() or "uploaded-image"
+    modality_id = str(payload.get("modality_id", "rgb")).strip().lower()
+    canonical_name = MODALITY_ID_TO_CANONICAL.get(modality_id)
+
+    if not canonical_name:
+        return {"error": f"Unknown modality_id: {modality_id}"}
+
+    if not data_url.startswith("data:image/") or "," not in data_url:
+        return {"error": "Expected a browser image data URL."}
+
+    _, encoded = data_url.split(",", 1)
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except Exception:
+        return {"error": "Uploaded image could not be decoded."}
+
+    max_bytes = 8 * 1024 * 1024
+    if len(raw) > max_bytes:
+        return {"error": "Uploaded image is larger than 8 MB."}
+
+    try:
+        from PIL import Image
+        image = Image.open(BytesIO(raw))
+        image.verify()
+        image = Image.open(BytesIO(raw)).convert("RGB")
+        image.thumbnail((512, 512))
+        os.makedirs(ASSET_USER_DIR, exist_ok=True)
+        if canonical_name == "Depth":
+            target_path = DEPTH_PNG_PATH
+        elif canonical_name == "RGB":
+            target_path = RGB_PNG_PATH
+        else:
+            os.makedirs(USER_UPLOAD_DIR, exist_ok=True)
+            target_path = os.path.join(USER_UPLOAD_DIR, f"{modality_id}.png")
+
+        image.save(target_path, format="PNG")
+        _THUMBNAIL_CACHE.pop(target_path, None)
+        if canonical_name in ("Depth", "RGB"):
+            _DATA_CACHE.pop(canonical_name, None)
+
+        with open(target_path, "rb") as f:
+            saved = f.read()
+
+        return {
+            "ok": True,
+            "filename": filename,
+            "modality": MODALITY_CANONICAL_TO_LABEL.get(canonical_name, canonical_name),
+            "modality_id": modality_id,
+            "shape": [image.height, image.width, 3],
+            "thumbnail": b64e(saved),
+        }
+    except Exception as e:
+        return {"error": f"Uploaded image could not be processed: {str(e)}"}
 
 def _selected_flags(selected_modalities: Optional[str]) -> Dict[str, Any]:
     modality_config = load_modality_config()
@@ -1961,8 +2159,7 @@ def _build_synthetic_database_privacy(
     }
 
 
-async def _build_privacy_and_report(session: Dict[str, Any]) -> Dict[str, Any]:
-    step_start = time.time()
+def _build_privacy_prompt_payload(session: Dict[str, Any]) -> Dict[str, Any]:
     series = session["series"]
     raw_results = session["raw_results"]
     uwb_for_report = series["uwb"] if series["uwb"] is not None else np.zeros((100, 3))
@@ -2005,7 +2202,25 @@ async def _build_privacy_and_report(session: Dict[str, Any]) -> Dict[str, Any]:
         privacy_bundle["protected_llm_summary"],
         raw_report=raw_report,
     )
-    report_conclusion = await call_zhipu_llm(prompt)
+    return {
+        "raw_results": raw_results,
+        "raw_report": raw_report,
+        "privacy_bundle": privacy_bundle,
+        "prompt": prompt,
+    }
+
+
+async def _build_privacy_and_report(session: Dict[str, Any], llm_provider: Optional[str] = None) -> Dict[str, Any]:
+    step_start = time.time()
+    provider_key = normalize_llm_provider(llm_provider or session.get("llm_provider_key") or session.get("llm_provider"))
+    provider_label = llm_provider_label(provider_key)
+    privacy_payload = _build_privacy_prompt_payload(session)
+    raw_results = privacy_payload["raw_results"]
+    raw_report = privacy_payload["raw_report"]
+    privacy_bundle = privacy_payload["privacy_bundle"]
+    prompt = privacy_payload["prompt"]
+    report_conclusion = await call_selected_llm(prompt, provider_key)
+    session["llm_provider_key"] = provider_key
     return {
         "step3": {
             "time_sec": time.time() - step_start,
@@ -2013,8 +2228,11 @@ async def _build_privacy_and_report(session: Dict[str, Any]) -> Dict[str, Any]:
             "report_conclusion": report_conclusion,
             "plaintext_prompt": prompt,
             "report": raw_report,
+            "llm_provider": provider_label,
         },
         "privacy_protection": privacy_bundle["privacy_protection"],
+        "llm_provider": provider_label,
+        "llm_provider_key": provider_key,
     }
 
 @app.get("/api/dispatch")
@@ -2045,27 +2263,39 @@ async def run_dispatch(selected_modalities: Optional[str] = None):
     }
 
 @app.get("/api/privacy_shuffle")
-async def run_privacy_shuffle(session_id: str):
+async def run_privacy_shuffle(session_id: str, llm_provider: Optional[str] = None):
     session = _STAGED_SESSIONS.get(session_id)
     if not session:
         return {"error": "Unknown or expired session_id"}
-    if "privacy_protection" not in session or "step3" not in session:
-        session.update(await _build_privacy_and_report(session))
-    plaintext_prompt = session.get("step3", {}).get("plaintext_prompt") or session.get("step3", {}).get("llm_prompt")
+    provider_key = normalize_llm_provider(llm_provider or session.get("llm_provider_key") or session.get("llm_provider"))
+    if (
+        "privacy_protection" not in session
+        or not session.get("plaintext_prompt")
+    ):
+        privacy_payload = _build_privacy_prompt_payload(session)
+        session["privacy_protection"] = privacy_payload["privacy_bundle"]["privacy_protection"]
+        session["plaintext_prompt"] = privacy_payload["prompt"]
+    plaintext_prompt = session.get("plaintext_prompt") or session.get("step3", {}).get("plaintext_prompt") or session.get("step3", {}).get("llm_prompt")
     return {
         "schema": "he-multimodal-privacy/v1",
         "session_id": session_id,
         "privacy_protection": session["privacy_protection"],
         "plaintext_prompt": plaintext_prompt,
+        "llm_provider": session.get("llm_provider", llm_provider_label(provider_key)),
     }
 
 @app.get("/api/report")
-async def run_report(session_id: str):
+async def run_report(session_id: str, llm_provider: Optional[str] = None):
     session = _STAGED_SESSIONS.get(session_id)
     if not session:
         return {"error": "Unknown or expired session_id"}
-    if "privacy_protection" not in session or "step3" not in session:
-        session.update(await _build_privacy_and_report(session))
+    provider_key = normalize_llm_provider(llm_provider or session.get("llm_provider_key") or session.get("llm_provider"))
+    if (
+        "privacy_protection" not in session
+        or "step3" not in session
+        or session.get("llm_provider_key") != provider_key
+    ):
+        session.update(await _build_privacy_and_report(session, provider_key))
     return {
         "schema": "he-multimodal-report/v1",
         "session_id": session_id,
@@ -2073,11 +2303,11 @@ async def run_report(session_id: str):
         "step3": session["step3"],
         "privacy_protection": session["privacy_protection"],
         "data_source": "UT_HAR dataset",
-        "llm_provider": "ZhipuAI",
+        "llm_provider": session.get("llm_provider", llm_provider_label(provider_key)),
     }
 
 @app.get("/api/cycle")
-async def run_cycle(selected_modalities: Optional[str] = None):
+async def run_cycle(selected_modalities: Optional[str] = None, llm_provider: Optional[str] = None):
     """执行完整的数据处理周期 - 支持选择性模态加载
 
     Args:
@@ -2086,6 +2316,8 @@ async def run_cycle(selected_modalities: Optional[str] = None):
     """
     start_time = time.time()
     cycle_seed = time.time_ns()
+    provider_key = normalize_llm_provider(llm_provider)
+    provider_label = llm_provider_label(provider_key)
 
     # Load modality configuration
     modality_config = load_modality_config()
@@ -2403,7 +2635,7 @@ async def run_cycle(selected_modalities: Optional[str] = None):
             privacy_bundle["protected_llm_summary"],
             raw_report=raw_report,
         )
-        report_conclusion = await call_zhipu_llm(llm_prompt)
+        report_conclusion = await call_selected_llm(llm_prompt, provider_key)
 
         step3_time = time.time() - step3_start
 
@@ -2413,6 +2645,7 @@ async def run_cycle(selected_modalities: Optional[str] = None):
             "report_conclusion": report_conclusion,
             "plaintext_prompt": llm_prompt,
             "report": raw_report,  # 完整的报告对象
+            "llm_provider": provider_label,
         }
     except Exception as e:
         return {"error": f"Step 3 failed: {str(e)}"}
@@ -2426,7 +2659,7 @@ async def run_cycle(selected_modalities: Optional[str] = None):
         "step3": step3_data,
         "privacy_protection": privacy_bundle["privacy_protection"],
         "data_source": "UT_HAR dataset",
-        "llm_provider": "ZhipuAI"
+        "llm_provider": provider_label
     }
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

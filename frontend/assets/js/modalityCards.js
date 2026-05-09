@@ -404,59 +404,38 @@ function createModalityCard(modalityKey, modalityData) {
   }
 
   const cardId = `modality-${config.id}`;
+  const uploaded = Boolean(modalityData && modalityData.uploaded && modalityData.thumbnail);
+  const uploadedAttr = uploaded ? 'data-uploaded="true"' : 'data-uploaded="false"';
 
   let visualContent = '';
 
-  // 根据类型决定初始显示内容
-  if (config.type === 'image') {
-    // 图像类：显示PNG缩略图
-    if (modalityData.thumbnail) {
-      visualContent = `
-        <div class="card-visual">
-          <img src="data:image/png;base64,${modalityData.thumbnail}"
-               alt="${config.name}"
-               class="card-thumbnail" />
-        </div>
-      `;
-      console.log(`✅ ${modalityKey} 卡片生成: 使用PNG缩略图`);
-    } else {
-      visualContent = `
-        <div class="card-visual">
-          <div class="card-loading"></div>
-        </div>
-      `;
-      console.warn(`⚠️ ${modalityKey} 卡片生成: 无缩略图`);
-    }
-  } else if (config.type === 'timeseries') {
-    // 时序类：创建Canvas元素用于绘制3D波形
+  if (uploaded) {
     visualContent = `
       <div class="card-visual">
-        <canvas id="${cardId}-canvas" class="card-canvas"></canvas>
+        <button class="modality-replace-btn" type="button" data-modality-upload="${config.id}">Replace</button>
+        <img src="data:image/png;base64,${modalityData.thumbnail}"
+             alt="${config.name}"
+             class="card-thumbnail" />
       </div>
     `;
-    console.log(`🎨 ${modalityKey} 卡片生成: 创建时序Canvas（${config.channels}通道）`);
-  } else if (config.type === 'skeleton') {
-    // 骨架类：创建Canvas元素用于绘制火柴人
-    visualContent = `
-      <div class="card-visual">
-        <canvas id="${cardId}-canvas" class="skeleton-canvas"></canvas>
-      </div>
-    `;
-    console.log(`🎨 ${modalityKey} 卡片生成: 创建骨架Canvas`);
+    console.log(`✅ ${modalityKey} 卡片生成: 使用上传图片`);
   } else {
-    // 默认占位符或加载动画
     visualContent = `
       <div class="card-visual">
-        <div class="card-loading"></div>
+        <button class="modality-upload-empty" type="button" data-modality-upload="${config.id}" aria-label="Upload image for ${config.name}">
+          <span class="modality-upload-plus">+</span>
+          <span class="modality-upload-text">Upload image</span>
+        </button>
       </div>
     `;
-    console.warn(`⚠️ ${modalityKey} 卡片生成: 未知类型 ${config.type}`);
+    console.log(`⬜ ${modalityKey} 卡片生成: 等待上传图片`);
   }
 
   return `
-    <div class="modality-card" id="${cardId}" data-modality="${modalityKey}">
+    <div class="modality-card" id="${cardId}" data-modality="${modalityKey}" ${uploadedAttr}>
       <div class="card-title">${config.name}</div>
       ${visualContent}
+      <input class="modality-upload-input" type="file" accept="image/*" data-modality-file="${config.id}" hidden />
     </div>
   `;
 }

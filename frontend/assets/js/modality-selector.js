@@ -13,6 +13,11 @@ class ModalitySelector {
     this.apiTimeout = 30000; // 30 seconds
     this.reportTimeoutMs = 45000; // 45 seconds for report generation
     this.modalityThumbnails = {}; // 存储模态缩略图
+    this.uploadedMedicalImage = null;
+    this.uploadedModalityImages = {};
+    this.selectedLlmProvider = 'qwen';
+    this.selectedLlmLabel = 'Qwen';
+    this.llmConfirmationResolver = null;
     this.init();
   }
 
@@ -71,7 +76,7 @@ class ModalitySelector {
 
       // 使用默认配置
       this.modalities = this.getDefaultModalities();
-      this.showWarning('Using fallback modality configuration');
+      console.warn('Using fallback modality configuration');
     }
   }
 
@@ -230,7 +235,10 @@ class ModalitySelector {
         const config = ModalityCards.MODALITY_CONFIG[modality.id];
         if (config) {
           // 传递完整的API响应数据
-          const modalityData = this.modalityThumbnails[modality.name] || {};
+          const modalityData = {
+            ...(this.modalityThumbnails[modality.name] || {}),
+            ...(this.uploadedModalityImages[modality.id] || {})
+          };
 
           // 调试：检查数据
           console.log(`🎨 渲染卡片 ${modality.id}:`, {
@@ -251,7 +259,7 @@ class ModalitySelector {
           card.dataset.modalityName = modality.name;
 
           // 时序和骨架类型需要Canvas绘制
-          if (modalityData.data && (config.type === 'timeseries' || config.type === 'skeleton')) {
+          if (!modalityData.uploaded && modalityData.data && (config.type === 'timeseries' || config.type === 'skeleton')) {
             const canvasId = `modality-${modality.id}-canvas`;
             console.log(`🎨 即将绘制 ${modality.id} Canvas, canvasId: ${canvasId}, 数据形状: ${modalityData.shape}`);
 
@@ -305,10 +313,28 @@ class ModalitySelector {
 
     if (container) {
       container.addEventListener('click', (e) => {
+        const uploadButton = e.target.closest('[data-modality-upload]');
+        if (uploadButton) {
+          e.preventDefault();
+          e.stopPropagation();
+          const modalityId = uploadButton.dataset.modalityUpload;
+          const input = container.querySelector(`.modality-upload-input[data-modality-file="${modalityId}"]`);
+          if (input) input.click();
+          return;
+        }
+
         const card = e.target.closest('.modality-card');
         if (card) {
           this.handleCardClick(card);
         }
+      });
+
+      container.addEventListener('change', (e) => {
+        const input = e.target.closest('.modality-upload-input[data-modality-file]');
+        if (!input) return;
+        const file = input.files && input.files[0];
+        if (file) this.uploadMedicalImage(file, input.dataset.modalityFile);
+        input.value = '';
       });
     }
 
@@ -317,6 +343,174 @@ class ModalitySelector {
         this.launchAnalysis();
       });
     }
+
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('.llm-icon-option[data-llm-provider]');
+      if (button) this.selectLlmProvider(button);
+
+      const confirmButton = event.target.closest('#confirmLlmBtn');
+      if (confirmButton) this.confirmLlmSelection(confirmButton);
+    });
+    this.updateLlmSelectionState();
+  }
+
+  get llmProviderButtons() {
+    return Array.from(document.querySelectorAll('.llm-icon-option[data-llm-provider]'));
+  }
+
+  selectLlmProvider(button) {
+    this.selectedLlmProvider = button.dataset.llmProvider || 'qwen';
+    this.selectedLlmLabel = button.dataset.llmLabel || 'Qwen';
+    this.llmProviderButtons.forEach(option => {
+      const isSelected = option.dataset.llmProvider === this.selectedLlmProvider;
+      option.classList.toggle('active', isSelected);
+      option.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    });
+    this.updateLlmSelectionState();
+  }
+
+  getActiveLlmButton() {
+    return this.llmProviderButtons.find(button => button.dataset.llmProvider === this.selectedLlmProvider)
+      || this.llmProviderButtons.find(button => button.classList.contains('active'))
+      || this.llmProviderButtons[0]
+      || null;
+  }
+
+  getSelectedLlmProvider() {
+    const activeButton = this.getActiveLlmButton();
+    return activeButton ? activeButton.dataset.llmProvider : this.selectedLlmProvider || 'qwen';
+  }
+
+  getSelectedLlmLabel() {
+    const activeButton = this.getActiveLlmButton();
+    return activeButton ? activeButton.dataset.llmLabel : this.selectedLlmLabel || 'Qwen';
+  }
+
+  updateLlmSelectionState(stateText) {
+    const label = this.getSelectedLlmLabel();
+    const provider = this.getSelectedLlmProvider();
+    const tLlm = document.getElementById('tLlm');
+    const routeMeta = document.getElementById('llmRouteMeta');
+    const confirmButton = document.getElementById('confirmLlmBtn');
+    const route = document.getElementById('llmPromptRoute');
+    const group = document.getElementById('llmIconGroup');
+    const activeButton = this.getActiveLlmButton();
+
+    this.llmProviderButtons.forEach(option => {
+      const isSelected = option.dataset.llmProvider === provider;
+      option.classList.toggle('active', isSelected);
+      option.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    });
+    if (tLlm) {
+      tLlm.textContent = label;
+    }
+    if (routeMeta) {
+      routeMeta.textContent = stateText || `Ready to send to ${label} after shuffle.`;
+    }
+    if (confirmButton && !confirmButton.disabled) {
+      confirmButton.textContent = `Confirm ${label} and generate report`;
+    }
+    if (route && group && activeButton) {
+      window.requestAnimationFrame(() => {
+        const groupRect = group.getBoundingClientRect();
+        const buttonRect = activeButton.getBoundingClientRect();
+        const targetX = Math.round(buttonRect.left + buttonRect.width / 2 - groupRect.left);
+        route.style.setProperty('--arrow-x', `${Math.max(20, targetX)}px`);
+      });
+    }
+  }
+
+  waitForLlmConfirmation() {
+    const confirmButton = document.getElementById('confirmLlmBtn');
+    if (confirmButton) {
+      confirmButton.disabled = false;
+      confirmButton.textContent = `Confirm ${this.getSelectedLlmLabel()} and generate report`;
+      confirmButton.classList.remove('confirmed');
+    }
+
+    return new Promise(resolve => {
+      this.llmConfirmationResolver = resolve;
+    });
+  }
+
+  confirmLlmSelection(button) {
+    const label = this.getSelectedLlmLabel();
+    if (button) {
+      button.disabled = true;
+      button.classList.add('confirmed');
+      button.textContent = `Confirmed ${label}`;
+    }
+    this.updateLlmSelectionState(`Confirmed ${label}. Generating report...`);
+    if (this.llmConfirmationResolver) {
+      const resolve = this.llmConfirmationResolver;
+      this.llmConfirmationResolver = null;
+      resolve();
+    }
+  }
+
+  async uploadMedicalImage(file, modalityId) {
+    const targetModality = this.modalities.find(modality => modality.id === modalityId);
+    const targetLabel = targetModality ? targetModality.name : modalityId;
+    if (!file.type.startsWith('image/')) {
+      this.showWarning('Please choose an image file.');
+      return;
+    }
+
+    try {
+      const dataUrl = await this.readFileAsDataUrl(file);
+      const apiBase = (typeof API_BASE !== 'undefined')
+        ? API_BASE
+        : (window.location.port === "8001"
+          ? `${window.location.protocol}//${window.location.hostname}:8082`
+          : "");
+      const response = await this.fetchWithTimeout(`${apiBase}/api/upload_medical_image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modality_id: modalityId,
+          filename: file.name,
+          content_type: file.type,
+          data_url: dataUrl
+        })
+      }, 15000);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.error) {
+        throw new Error(payload.error || `HTTP error! status: ${response.status}`);
+      }
+
+      this.uploadedMedicalImage = payload;
+      this.uploadedModalityImages[modalityId] = {
+        type: 'image',
+        thumbnail: payload.thumbnail,
+        shape: payload.shape || [64, 64, 3],
+        uploaded: true
+      };
+      this.renderCards();
+      this.restoreSelectedCards();
+      this.selectedModalities.add(modalityId);
+      this.restoreSelectedCards();
+      this.updateUI();
+      this.updateModelCluster();
+    } catch (error) {
+      console.error('Medical image upload failed:', error);
+      this.showError(`${targetLabel} image upload failed: ${error.message}`);
+    }
+  }
+
+  readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Could not read selected image.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  restoreSelectedCards() {
+    document.querySelectorAll('.modality-card').forEach(card => {
+      const modalityId = card.dataset.modalityId;
+      card.classList.toggle('active', this.selectedModalities.has(modalityId));
+    });
   }
 
   handleCardClick(card) {
@@ -498,13 +692,34 @@ class ModalitySelector {
       await this.wait(10500);
 
       if (typeof setWorkflowStep === 'function') {
+        setWorkflowStep('llm');
+      }
+      this.updateLlmSelectionState('Choose an LLM, then confirm to generate the report.');
+      await this.waitForLlmConfirmation();
+      const llmProvider = this.getSelectedLlmProvider();
+      const llmLabel = this.getSelectedLlmLabel();
+      this.updateLlmSelectionState(`Sending protected summary to ${llmLabel}.`);
+
+      if (typeof setWorkflowStep === 'function') {
         setWorkflowStep('report');
       }
-      this.updateProgress(85, 'Generating protected health report...');
+      this.updateProgress(85, `Generating protected health report with ${llmLabel}...`);
+      const reportSpinner = document.getElementById('spinDecrypt');
+      if (reportSpinner) {
+        const spinnerText = reportSpinner.querySelector('.spinText');
+        if (spinnerText) spinnerText.textContent = `Generating report with ${llmLabel}...`;
+        reportSpinner.style.display = 'flex';
+      }
+      const tDecrypt = document.getElementById('tDecrypt');
+      if (tDecrypt) {
+        tDecrypt.className = 'pill running';
+        tDecrypt.textContent = 'Generating';
+      }
       const reportData = await this.fetchJson(
-        `${apiBase}/api/report?session_id=${encodeURIComponent(dispatchData.session_id)}`,
+        `${apiBase}/api/report?session_id=${encodeURIComponent(dispatchData.session_id)}&llm_provider=${encodeURIComponent(llmProvider)}`,
         { timeout: this.reportTimeoutMs }
       );
+      this.updateLlmSelectionState(`Protected summary sent to ${llmLabel}.`);
 
       // 重置重试计数
       this.retryCount = 0;
@@ -518,7 +733,7 @@ class ModalitySelector {
         step3: reportData.step3,
         privacy_protection: reportData.privacy_protection || privacyData.privacy_protection,
         data_source: reportData.data_source || dispatchData.data_source,
-        llm_provider: reportData.llm_provider || dispatchData.llm_provider,
+        llm_provider: reportData.llm_provider || privacyData.llm_provider || dispatchData.llm_provider,
       };
 
     } catch (error) {
@@ -621,6 +836,7 @@ class ModalitySelector {
     }
     if (typeof renderPrivacyProtection === 'function') {
       renderPrivacyProtection(privacy);
+      this.updateLlmSelectionState();
     }
   }
 
@@ -671,19 +887,10 @@ class ModalitySelector {
       uploadSpinner.style.display = 'none';
     }
 
-    // 在Clinical Report Generation区域显示加载状态
+    // Report generation starts only after the user confirms the target LLM.
     const reportSpinner = document.getElementById('spinDecrypt');
     if (reportSpinner) {
-      if (loading) {
-        // 更新文本显示当前处理状态
-        const spinnerText = reportSpinner.querySelector('.spinText');
-        if (spinnerText) {
-          spinnerText.textContent = 'Generating clinical report...';
-        }
-        reportSpinner.style.display = 'flex';
-      } else {
-        reportSpinner.style.display = 'none';
-      }
+      reportSpinner.style.display = 'none';
     }
 
     // 同时更新Step 3的状态标签
@@ -702,8 +909,8 @@ class ModalitySelector {
     const tDecrypt = document.getElementById('tDecrypt');
     if (tDecrypt) {
       if (loading) {
-        tDecrypt.className = 'pill running';
-        tDecrypt.textContent = 'Generating';
+        tDecrypt.className = 'pill';
+        tDecrypt.textContent = '—';
       } else {
         // 保持完成后状态或重置
         if (!tDecrypt.textContent.includes('Done') && !tDecrypt.textContent.includes('sec')) {
