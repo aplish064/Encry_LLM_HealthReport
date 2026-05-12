@@ -4,6 +4,7 @@
 
 class ModalitySelector {
   constructor() {
+    this.currentScenario = 'healthcare';
     this.selectedModalities = new Set();
     this.maxSelection = 10; // 支持最多10种模态
     this.modalities = [];
@@ -25,6 +26,7 @@ class ModalitySelector {
     console.log('🔵 ModalitySelector initialization started');
     try {
       this.setLoadingState(true);
+      this.applyScenarioLabels();
       await this.loadModalities();
       await this.loadModalityThumbnails(); // 加载缩略图
       this.renderCards();
@@ -50,7 +52,7 @@ class ModalitySelector {
         : (window.location.port === "8001"
           ? `${window.location.protocol}//${window.location.hostname}:8082`
           : "");
-      const response = await this.fetchWithTimeout(`${apiBase}/api/modalities`, {
+      const response = await this.fetchWithTimeout(`${apiBase}/api/modalities?scenario=${encodeURIComponent(this.currentScenario)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'
@@ -63,6 +65,7 @@ class ModalitySelector {
 
       const data = await response.json();
       this.modalities = data.modalities || [];
+      this.maxSelection = this.currentScenario === 'finance' ? Math.min(6, this.modalities.length || 6) : 10;
     } catch (error) {
       console.error('Failed to load modality configuration:', error);
 
@@ -76,6 +79,7 @@ class ModalitySelector {
 
       // 使用默认配置
       this.modalities = this.getDefaultModalities();
+      this.maxSelection = this.currentScenario === 'finance' ? 6 : 10;
       console.warn('Using fallback modality configuration');
     }
   }
@@ -96,7 +100,7 @@ class ModalitySelector {
         console.log(`Loading thumbnail for ${modality.name}...`);
 
         const response = await this.fetchWithTimeout(
-          `${apiBase}/api/modality_thumbnail?modality=${encodeURIComponent(modality.name)}`,
+          `${apiBase}/api/modality_thumbnail?scenario=${encodeURIComponent(this.currentScenario)}&modality=${encodeURIComponent(modality.name)}`,
           { method: 'GET', timeout: 10000 }
         );
 
@@ -149,6 +153,59 @@ class ModalitySelector {
   }
 
   getDefaultModalities() {
+    if (this.currentScenario === 'finance') {
+      return [
+        {
+          id: 'income',
+          name: 'Income',
+          type: 'finance',
+          description: 'Salary, recurring income, and income stability',
+          fields: ['monthly_income_usd', 'income_stability', 'employment_tenure_months'],
+          icon: '$'
+        },
+        {
+          id: 'expenses',
+          name: 'Expenses',
+          type: 'finance',
+          description: 'Recurring spending and monthly obligation load',
+          fields: ['monthly_expenses_usd', 'fixed_obligations_usd', 'expense_volatility'],
+          icon: '$'
+        },
+        {
+          id: 'savings',
+          name: 'Savings',
+          type: 'finance',
+          description: 'Cash reserves and emergency-fund resilience',
+          fields: ['savings_balance_usd', 'emergency_fund_months', 'monthly_savings_rate'],
+          icon: '$'
+        },
+        {
+          id: 'loan',
+          name: 'Loan',
+          type: 'finance',
+          description: 'Debt balance, payment pressure, and loan stress',
+          fields: ['loan_balance_usd', 'monthly_payment_usd', 'debt_to_income_ratio'],
+          icon: '$'
+        },
+        {
+          id: 'credit',
+          name: 'Credit',
+          type: 'finance',
+          description: 'Credit score, utilization, and repayment risk',
+          fields: ['credit_score', 'credit_utilization', 'missed_payments_12m'],
+          icon: '$'
+        },
+        {
+          id: 'profile',
+          name: 'Profile',
+          type: 'finance',
+          description: 'Household context and financial profile signals',
+          fields: ['age_band', 'household_size', 'risk_tolerance'],
+          icon: '$'
+        }
+      ];
+    }
+
     return [
       {
         id: 'depth',
@@ -223,6 +280,48 @@ class ModalitySelector {
     ];
   }
 
+  getScenarioLabels() {
+    if (this.currentScenario === 'finance') {
+      return {
+        selectStep: 'Select Financial Data',
+        dataTitle: 'Select Financial Data',
+        dataSubtitle: 'Choose financial field groups for encrypted risk inference.',
+        modelTitle: 'Financial Data Encoders',
+        modelSubtitle: 'Selected financial data are dispatched to specialized local encoders.',
+        reportTitle: 'Protected Financial Risk Report',
+        reportSubtitle: 'Privacy-preserved financial summary with status and recommendations.'
+      };
+    }
+
+    return {
+      selectStep: 'Select Medical Data',
+      dataTitle: 'Select Medical Data',
+      dataSubtitle: 'Choose multimodal data sources for encrypted health inference.',
+      modelTitle: 'Multimodal Data Encoders',
+      modelSubtitle: 'Selected medical data are dispatched to specialized local encoders.',
+      reportTitle: 'Protected Health Report',
+      reportSubtitle: 'Privacy-preserved clinical summary with status and recommendations.'
+    };
+  }
+
+  applyScenarioLabels() {
+    const labels = this.getScenarioLabels();
+    const labelTargets = {
+      stepSelectLabel: labels.selectStep,
+      dataPanelTitle: labels.dataTitle,
+      dataPanelSubtitle: labels.dataSubtitle,
+      modelPanelTitle: labels.modelTitle,
+      modelPanelSubtitle: labels.modelSubtitle,
+      reportPanelTitle: labels.reportTitle,
+      reportPanelSubtitle: labels.reportSubtitle
+    };
+
+    Object.entries(labelTargets).forEach(([id, text]) => {
+      const element = document.getElementById(id);
+      if (element) element.textContent = text;
+    });
+  }
+
   renderCards() {
     const container = document.getElementById('modalitySelector');
     if (!container) return;
@@ -236,6 +335,7 @@ class ModalitySelector {
         if (config) {
           // 传递完整的API响应数据
           const modalityData = {
+            ...modality,
             ...(this.modalityThumbnails[modality.name] || {}),
             ...(this.uploadedModalityImages[modality.id] || {})
           };
@@ -310,6 +410,7 @@ class ModalitySelector {
   attachEventListeners() {
     const container = document.getElementById('modalitySelector');
     const analyzeBtn = document.getElementById('analyzeBtn');
+    const sceneTabs = document.getElementById('sceneTabs');
 
     if (container) {
       container.addEventListener('click', (e) => {
@@ -317,6 +418,7 @@ class ModalitySelector {
         if (uploadButton) {
           e.preventDefault();
           e.stopPropagation();
+          if (this.isLoading) return;
           const modalityId = uploadButton.dataset.modalityUpload;
           const input = container.querySelector(`.modality-upload-input[data-modality-file="${modalityId}"]`);
           if (input) input.click();
@@ -332,6 +434,10 @@ class ModalitySelector {
       container.addEventListener('change', (e) => {
         const input = e.target.closest('.modality-upload-input[data-modality-file]');
         if (!input) return;
+        if (this.isLoading) {
+          input.value = '';
+          return;
+        }
         const file = input.files && input.files[0];
         if (file) this.uploadMedicalImage(file, input.dataset.modalityFile);
         input.value = '';
@@ -344,6 +450,13 @@ class ModalitySelector {
       });
     }
 
+    if (sceneTabs) {
+      sceneTabs.addEventListener('click', (event) => {
+        const tab = event.target.closest('.scene-tab[data-scenario]');
+        if (tab) this.switchScenario(tab.dataset.scenario);
+      });
+    }
+
     document.addEventListener('click', (event) => {
       const button = event.target.closest('.llm-icon-option[data-llm-provider]');
       if (button) this.selectLlmProvider(button);
@@ -352,6 +465,94 @@ class ModalitySelector {
       if (confirmButton) this.confirmLlmSelection(confirmButton);
     });
     this.updateLlmSelectionState();
+  }
+
+  async switchScenario(nextScenario) {
+    const normalizedScenario = String(nextScenario || '').toLowerCase();
+    if (!['healthcare', 'finance'].includes(normalizedScenario) || normalizedScenario === this.currentScenario || this.isLoading) {
+      return;
+    }
+
+    this.currentScenario = normalizedScenario;
+    document.querySelectorAll('.scene-tab[data-scenario]').forEach(tab => {
+      const isActive = tab.dataset.scenario === this.currentScenario;
+      tab.classList.toggle('active', isActive);
+      tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    this.selectedModalities.clear();
+    this.modalityThumbnails = {};
+    this.uploadedMedicalImage = null;
+    this.uploadedModalityImages = {};
+    this.applyScenarioLabels();
+    this.resetWorkflowForScenario();
+    this.setLoadingState(true);
+
+    try {
+      await this.loadModalities();
+      await this.loadModalityThumbnails();
+      this.renderCards();
+      this.updateUI();
+      this.updateModelCluster();
+    } catch (error) {
+      console.error('Scenario switch failed:', error);
+      this.showError('Could not switch scene. Please retry.');
+    } finally {
+      this.setLoadingState(false);
+      this.updateUI();
+    }
+  }
+
+  resetWorkflowForScenario() {
+    this.hideProgress();
+    const progressFill = document.getElementById('progressFill');
+    if (progressFill) progressFill.style.width = '0%';
+    const progressText = document.getElementById('progressText');
+    if (progressText) progressText.textContent = 'Preparing...';
+
+    ['tUpload', 'tDispatch', 'tProtect', 'tDecrypt'].forEach(id => {
+      const pill = document.getElementById(id);
+      if (pill) {
+        pill.className = 'pill';
+        pill.textContent = '—';
+      }
+    });
+
+    const ctPreview = document.getElementById('ctResPreview');
+    if (ctPreview) ctPreview.textContent = '—';
+    const privacyPanel = document.getElementById('privacyPanel');
+    if (privacyPanel) privacyPanel.textContent = 'Select modalities and run analysis to generate the anonymized privacy flow.';
+    const resultsTitle = document.getElementById('resultsTitle');
+    if (resultsTitle) resultsTitle.textContent = 'Key Results';
+    const resultTable = document.getElementById('resultTable');
+    const resultBody = resultTable ? resultTable.querySelector('tbody') : null;
+    if (resultBody) {
+      resultBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: #5b6474;">Loading...</td></tr>';
+    }
+    const conclusionPanel = document.getElementById('conclusionPanel');
+    if (conclusionPanel) {
+      conclusionPanel.style.display = 'block';
+      conclusionPanel.textContent = 'Loading...';
+    }
+    const recommendPanel = document.getElementById('recommendPanel');
+    if (recommendPanel) {
+      recommendPanel.style.display = 'block';
+      recommendPanel.textContent = 'Loading...';
+    }
+    const reportText = document.getElementById('reportText');
+    if (reportText) {
+      reportText.style.display = 'none';
+      reportText.textContent = '—';
+    }
+    const thumbnailsGrid = document.getElementById('thumbnailsGrid');
+    if (thumbnailsGrid) {
+      thumbnailsGrid.style.display = 'none';
+      thumbnailsGrid.innerHTML = '';
+    }
+    this.updateLlmSelectionState();
+    if (typeof setWorkflowStep === 'function') {
+      setWorkflowStep('select');
+    }
   }
 
   get llmProviderButtons() {
@@ -449,6 +650,7 @@ class ModalitySelector {
   }
 
   async uploadMedicalImage(file, modalityId) {
+    if (this.isLoading) return;
     const targetModality = this.modalities.find(modality => modality.id === modalityId);
     const targetLabel = targetModality ? targetModality.name : modalityId;
     if (!file.type.startsWith('image/')) {
@@ -478,6 +680,8 @@ class ModalitySelector {
         throw new Error(payload.error || `HTTP error! status: ${response.status}`);
       }
 
+      if (this.isLoading) return;
+
       this.uploadedMedicalImage = payload;
       this.uploadedModalityImages[modalityId] = {
         type: 'image',
@@ -493,6 +697,7 @@ class ModalitySelector {
       this.updateModelCluster();
     } catch (error) {
       console.error('Medical image upload failed:', error);
+      if (this.isLoading) return;
       this.showError(`${targetLabel} image upload failed: ${error.message}`);
     }
   }
@@ -514,6 +719,7 @@ class ModalitySelector {
   }
 
   handleCardClick(card) {
+    if (this.isLoading) return;
     const modalityId = card.dataset.modalityId;
     console.log(`🟢 卡片点击: ${modalityId}`);
 
@@ -546,6 +752,10 @@ class ModalitySelector {
     if (countElement) {
       countElement.textContent = this.selectedModalities.size;
     }
+    const limitElement = document.getElementById('selectionLimit');
+    if (limitElement) {
+      limitElement.textContent = this.maxSelection;
+    }
 
     // 更新按钮状态
     const analyzeBtn = document.getElementById('analyzeBtn');
@@ -559,15 +769,13 @@ class ModalitySelector {
 
   updateModelCluster() {
     // 根据选中的数据更新Step 2的local encoders
-    // 始终显示所有10个模型，选中的高亮(active)，未选中的变暗(inactive)
     const clusterGrid = document.getElementById('modelCluster');
     if (!clusterGrid) {
       console.warn('⚠️ modelCluster element not found');
       return;
     }
 
-    // 模态ID到工具的映射关系（使用小写ID）
-    const clusterModels = [
+    const healthcareModels = [
       { id: 'sleep', title: 'Sleep Staging', subtitle: 'Depth-based Model', modalityId: 'depth' },
       { id: 'bp', title: 'Blood Pressure', subtitle: 'UWB Regression', modalityId: 'uwb' },
       { id: 'metabolic', title: 'Metabolic Score', subtitle: 'IMU Proxy', modalityId: 'imu' },
@@ -579,6 +787,15 @@ class ModalitySelector {
       { id: 'cancer', title: 'Cancer Detection', subtitle: 'Pathology Model', modalityId: 'path' },
       { id: 'blood', title: 'Blood Analysis', subtitle: 'Hematology Model', modalityId: 'blood' }
     ];
+    const financeModels = [
+      { id: 'income_capacity', title: 'Income Capacity', subtitle: 'Income Encoder', modalityId: 'income' },
+      { id: 'expense_burden', title: 'Expense Burden', subtitle: 'Expenses Encoder', modalityId: 'expenses' },
+      { id: 'savings_resilience', title: 'Savings Resilience', subtitle: 'Savings Encoder', modalityId: 'savings' },
+      { id: 'loan_stress', title: 'Loan Stress', subtitle: 'Loan Encoder', modalityId: 'loan' },
+      { id: 'credit_risk', title: 'Credit Risk', subtitle: 'Credit Encoder', modalityId: 'credit' },
+      { id: 'profile_context', title: 'Profile Context', subtitle: 'Profile Encoder', modalityId: 'profile' }
+    ];
+    const clusterModels = this.currentScenario === 'finance' ? financeModels : healthcareModels;
 
     // 清空并重新创建所有模型卡片（使用与app.js相同的HTML结构）
     clusterGrid.innerHTML = '';
@@ -677,7 +894,7 @@ class ModalitySelector {
         setWorkflowStep('model');
       }
       const dispatchData = await this.fetchJson(
-        `${apiBase}/api/dispatch?selected_modalities=${encodeURIComponent(selectedList)}`
+        `${apiBase}/api/dispatch?scenario=${encodeURIComponent(this.currentScenario)}&selected_modalities=${encodeURIComponent(selectedList)}`
       );
       this.renderDispatchStage(dispatchData);
 
@@ -703,11 +920,12 @@ class ModalitySelector {
       if (typeof setWorkflowStep === 'function') {
         setWorkflowStep('report');
       }
-      this.updateProgress(85, `Generating protected health report with ${llmLabel}...`);
+      const reportKind = this.currentScenario === 'finance' ? 'financial risk report' : 'health report';
+      this.updateProgress(85, `Generating protected ${reportKind} with ${llmLabel}...`);
       const reportSpinner = document.getElementById('spinDecrypt');
       if (reportSpinner) {
         const spinnerText = reportSpinner.querySelector('.spinText');
-        if (spinnerText) spinnerText.textContent = `Generating report with ${llmLabel}...`;
+        if (spinnerText) spinnerText.textContent = `Generating ${reportKind} with ${llmLabel}...`;
         reportSpinner.style.display = 'flex';
       }
       const tDecrypt = document.getElementById('tDecrypt');
@@ -939,13 +1157,30 @@ class ModalitySelector {
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       max-width: 400px;
     `;
-    errorDiv.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <span style="font-size: 24px;">❌</span>
-        <div style="flex: 1;">${message}</div>
-        <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #991b1b;">✕</button>
-      </div>
-    `;
+
+    const content = document.createElement('div');
+    content.style.cssText = 'display: flex; align-items: center; gap: 12px;';
+
+    const icon = document.createElement('span');
+    icon.style.cssText = 'font-size: 24px;';
+    icon.textContent = '❌';
+
+    const messageDiv = document.createElement('div');
+    messageDiv.style.cssText = 'flex: 1;';
+    messageDiv.textContent = message;
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.style.cssText = 'background: none; border: none; font-size: 20px; cursor: pointer; color: #991b1b;';
+    closeButton.textContent = '✕';
+    closeButton.addEventListener('click', () => {
+      errorDiv.remove();
+    });
+
+    content.appendChild(icon);
+    content.appendChild(messageDiv);
+    content.appendChild(closeButton);
+    errorDiv.appendChild(content);
 
     document.body.appendChild(errorDiv);
 

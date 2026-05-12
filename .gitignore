@@ -18,11 +18,13 @@ __pycache__/
 
 # Data files
 FL-Datasets-for-HAR/
-test_data/
+test_data/*
 generated_charts/
 sample_data/
 *.txt
 *.csv
+!test_data/
+!test_data/synthetic_personal_finance_dataset.csv
 !requirements.txt
 !README*.txt
 !QUICKSTART.txt

@@ -282,6 +282,7 @@ function svgSpark(values, opts = {}) {
 
 function svgGauge(prob, label) {
   const p = Math.max(0, Math.min(1, Number(prob)));
+  const gaugeLabel = label || "Score";
   const w = 360, h = 140;
   const pad = 20;
   const barHeight = 40;
@@ -301,7 +302,7 @@ function svgGauge(prob, label) {
   const highStart = barX + barWidth * 0.7;
 
   return `
-  <svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Health index">
+  <svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${escHtml(gaugeLabel)}">
     <rect x="1" y="1" width="${w-2}" height="${h-2}" rx="12" fill="#ffffff" stroke="rgba(230,232,239,.8)"/>
 
     <!-- Health-index band backgrounds -->
@@ -322,7 +323,7 @@ function svgGauge(prob, label) {
 
     <!-- Percentage and label -->
     <text x="${w / 2}" y="35" text-anchor="middle" font-size="32" font-weight="900" fill="#0f172a">${pct}%</text>
-    <text x="${w / 2}" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="rgba(15,23,42,.6)">${escHtml(label || "")}</text>
+    <text x="${w / 2}" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="rgba(15,23,42,.6)">${escHtml(gaugeLabel)}</text>
 
     <!-- Threshold lines -->
     <line x1="${lowEnd}" y1="${barY - 3}" x2="${lowEnd}" y2="${barY + barHeight + 3}" stroke="rgba(15,23,42,.2)" stroke-width="1.5" stroke-dasharray="3,3"/>
@@ -710,6 +711,13 @@ function renderPrivacyProtection(privacy) {
     return;
   }
 
+  const protectedSummary = privacy.protected_llm_summary_preview || {};
+  const summaryMetrics = protectedSummary.metrics || {};
+  const domain = protectedSummary.domain || "healthcare";
+  const isFinanceDomain = domain === "finance";
+  const privacyMetricText = isFinanceDomain
+    ? "Model scores / financial buckets / risk profile"
+    : "Model scores / physiological metrics / risk profile";
   const distributionSummary = privacy.distribution_summary || {};
   const valueHistogram = Array.isArray(distributionSummary.value_histogram)
     ? distributionSummary.value_histogram
@@ -821,8 +829,6 @@ function renderPrivacyProtection(privacy) {
       ${escHtml(label)}
     </span>`
   )).join("");
-  const protectedSummary = privacy.protected_llm_summary_preview || {};
-  const summaryMetrics = protectedSummary.metrics || {};
   const selectedRecordLabel = escHtml(safeText(
     privacy.selected_record_label,
     orderLabelsFinal[selectedOrderIndex] || orderLabelsFinal[0] || "Synthetic Record"
@@ -835,8 +841,18 @@ function renderPrivacyProtection(privacy) {
     </details>`
     : "";
   const llmPromptRouteHtml = renderLlmPromptRoute();
-  const bloodPressureBucket = escHtml(summaryMetrics.blood_pressure || "masked");
-  const sleepBucket = escHtml(summaryMetrics.sleep_efficiency || "masked");
+  const summaryBucketRows = isFinanceDomain
+    ? [
+        ["Cashflow Burden", summaryMetrics.cashflow_burden || "masked"],
+        ["Loan Stress", summaryMetrics.loan_stress || "masked"],
+      ]
+    : [
+        ["Blood Pressure", summaryMetrics.blood_pressure || "masked"],
+        ["Sleep Efficiency", summaryMetrics.sleep_efficiency || "masked"],
+      ];
+  const summaryBucketHtml = summaryBucketRows.map(([label, value]) => (
+    `<span>${escHtml(label)}: ${escHtml(value)}</span>`
+  )).join("");
   const bucketedSummaryThumb = `
     <div class="bucketedSummaryCard protectedReportThumb">
       <div class="protectedReportHead">
@@ -851,8 +867,7 @@ function renderPrivacyProtection(privacy) {
         <span style="--w:72%"></span>
       </div>
       <div class="protectedReportMeta">
-        <span>Blood Pressure: ${bloodPressureBucket}</span>
-        <span>Sleep Efficiency: ${sleepBucket}</span>
+        ${summaryBucketHtml}
       </div>
     </div>
   `;
@@ -885,7 +900,7 @@ function renderPrivacyProtection(privacy) {
         <div class="rawResultCard rawProfileCard">
           <strong>Encoded Inference Output</strong>
           <div class="rawProfileMetaRow">
-            <span>Model scores / physiological metrics / risk profile</span>
+            <span>${escHtml(privacyMetricText)}</span>
             <div class="profileLockChip">Encoded profile</div>
           </div>
           <div class="rawProfileBars">
@@ -945,6 +960,9 @@ function renderLegacyHealthReport(report, plaintextPrompt) {
   const badge = statusBadge(report.overall);
   const fall = report.fall_risk || {};
   const healthIndex = 1 - Math.min(1, Math.max(0, Number(fall.probability ?? 0)));
+  const scoreLabel = report.score_label || (report.domain === "finance" ? "Financial resilience" : "Health index");
+  const isFinanceReport = report.domain === "finance";
+  const reportTitle = isFinanceReport ? "Protected Financial Risk Report" : "Multimodal Health Report (demo)";
 
   const metrics = report.metrics || [];
   const chips = (fall.drivers || []).map(x => `<span class="chip">${escHtml(x)}</span>`).join("");
@@ -969,9 +987,11 @@ function renderLegacyHealthReport(report, plaintextPrompt) {
     `;
   }).join("");
 
-    const activityMix = report.charts?.activity_mix || {};
-  const vitals = report.charts?.vitals || {};
+  const activityMix = isFinanceReport ? (report.charts?.cashflow || {}) : (report.charts?.activity_mix || {});
+  const vitals = isFinanceReport ? (report.charts?.burden || {}) : (report.charts?.vitals || {});
   const radar = report.charts?.radar || {};
+  const activityTitle = isFinanceReport ? "Cashflow snapshot" : "Activity mix (7-day aggregate)";
+  const vitalsTitle = isFinanceReport ? "Risk factors vs reference" : "Vitals vs reference";
   const narrative = report.narrative || "";
   const recos = (report.recommendations || []).map(x => `<li>${escHtml(x)}</li>`).join("");
 
@@ -979,7 +999,7 @@ function renderLegacyHealthReport(report, plaintextPrompt) {
   panel.innerHTML = `
     <div class="reportTop">
       <div>
-        <div class="reportTitle">Multimodal Health Report (demo)</div>
+        <div class="reportTitle">${escHtml(reportTitle)}</div>
         <div class="reportText">${escHtml(narrative)}</div>
       </div>
       <div class="badge">
@@ -991,12 +1011,12 @@ function renderLegacyHealthReport(report, plaintextPrompt) {
     <div class="chartGrid">
       <div class="chartRow">
           <div class="chartBox">
-          <div class="chartTitle">Health Index</div>
-          <div class="svgBox">${svgGauge(healthIndex, "Health index")}</div>
+          <div class="chartTitle">${escHtml(scoreLabel)}</div>
+          <div class="svgBox">${svgGauge(healthIndex, scoreLabel)}</div>
           <div class="chipRow">${chips}</div>
         </div>
         <div class="chartBox">
-          <div class="chartTitle">Activity mix (7‑day aggregate)</div>
+          <div class="chartTitle">${escHtml(activityTitle)}</div>
           <div class="svgBox">${svgDonut(activityMix, {w:360, h:170})}</div>
         </div>
       </div>
@@ -1007,7 +1027,7 @@ function renderLegacyHealthReport(report, plaintextPrompt) {
           <div class="svgBox">${svgRadar(radar)}</div>
         </div>
         <div class="chartBox">
-          <div class="chartTitle">Vitals vs reference</div>
+          <div class="chartTitle">${escHtml(vitalsTitle)}</div>
           <div class="svgBox">${svgBarVitals(vitals)}</div>
         </div>
       </div>
@@ -1049,6 +1069,8 @@ function renderDynamicHealthReport(report, plaintextPrompt) {
   if (!panel) return;
 
   const summary = report?.summary || {};
+  const domain = report.domain || "healthcare";
+  const scoreLabel = report.score_label || (domain === "finance" ? "Financial resilience" : "Health index");
   const badge = statusBadge(summary.overall || report.overall);
   const expandedSections = Array.isArray(report.sections) ? report.sections : [];
   const compactSections = Array.isArray(report.compact_sections) ? report.compact_sections : [];
@@ -1104,6 +1126,7 @@ function renderDynamicHealthReport(report, plaintextPrompt) {
           <div>
             <div class="reportTitle">${escHtml(summary.title || "Integrated Summary")}</div>
             <div class="summaryScore">${Math.round(Number(summary.health_index || 0) * 100)}%</div>
+            <div class="summaryScoreLabel">${escHtml(scoreLabel)}</div>
           </div>
           <div class="badge">
             <span class="badgeDot" style="background:${badge.dot}"></span>

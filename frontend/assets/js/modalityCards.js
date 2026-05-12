@@ -20,7 +20,15 @@ const MODALITY_COLORS = {
   'Pathology': '#14b8a6',// 青
   'Blood': '#f43f5e',    // 玫红
   'Depth': '#3b82f6',    // 蓝
-  'RGB': '#8b5cf6'       // 紫
+  'RGB': '#8b5cf6',      // 紫
+
+  // 财务类
+  'Income': '#0f766e',
+  'Expenses': '#dc2626',
+  'Savings': '#2563eb',
+  'Loan': '#9333ea',
+  'Credit': '#ca8a04',
+  'Profile': '#475569'
 };
 
 const MODALITY_CONFIG = {
@@ -106,6 +114,60 @@ const MODALITY_CONFIG = {
     icon: '📷',
     description: 'Risk assessment and activity recognition',
     color: MODALITY_COLORS.RGB
+  },
+  'income': {
+    id: 'income',
+    name: 'Income',
+    type: 'finance',
+    icon: '$',
+    description: 'Salary, recurring income, and income stability',
+    fields: ['monthly_income_usd', 'income_stability', 'employment_tenure_months'],
+    color: MODALITY_COLORS.Income
+  },
+  'expenses': {
+    id: 'expenses',
+    name: 'Expenses',
+    type: 'finance',
+    icon: '$',
+    description: 'Recurring spending and monthly obligation load',
+    fields: ['monthly_expenses_usd', 'fixed_obligations_usd', 'expense_volatility'],
+    color: MODALITY_COLORS.Expenses
+  },
+  'savings': {
+    id: 'savings',
+    name: 'Savings',
+    type: 'finance',
+    icon: '$',
+    description: 'Cash reserves and emergency-fund resilience',
+    fields: ['savings_balance_usd', 'emergency_fund_months', 'monthly_savings_rate'],
+    color: MODALITY_COLORS.Savings
+  },
+  'loan': {
+    id: 'loan',
+    name: 'Loan',
+    type: 'finance',
+    icon: '$',
+    description: 'Debt balance, payment pressure, and loan stress',
+    fields: ['loan_balance_usd', 'monthly_payment_usd', 'debt_to_income_ratio'],
+    color: MODALITY_COLORS.Loan
+  },
+  'credit': {
+    id: 'credit',
+    name: 'Credit',
+    type: 'finance',
+    icon: '$',
+    description: 'Credit score, utilization, and repayment risk',
+    fields: ['credit_score', 'credit_utilization', 'missed_payments_12m'],
+    color: MODALITY_COLORS.Credit
+  },
+  'profile': {
+    id: 'profile',
+    name: 'Profile',
+    type: 'finance',
+    icon: '$',
+    description: 'Household context and financial profile signals',
+    fields: ['age_band', 'household_size', 'risk_tolerance'],
+    color: MODALITY_COLORS.Profile
   }
 };
 
@@ -394,6 +456,189 @@ function createImageCardHTML(modalityKey, imagePath) {
   `;
 }
 
+function escapeCardText(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatFinanceFieldName(fieldName) {
+  return String(fieldName || '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeFinancePreviewRows(preview, fields, description) {
+  if (Array.isArray(preview) && preview.length) {
+    return preview.slice(0, 3).map((item, index) => {
+      if (item && typeof item === 'object') {
+        const label = item.label || item.name || item.metric || `Field ${index + 1}`;
+        const value = item.value ?? item.amount ?? item.text ?? item.status ?? 'Ready';
+        return { label, value };
+      }
+      return { label: `Field ${index + 1}`, value: item };
+    });
+  }
+
+  if (preview && typeof preview === 'object' && Object.keys(preview).length) {
+    return Object.entries(preview).slice(0, 3).map(([label, value]) => ({ label, value }));
+  }
+
+  if (preview !== null && preview !== undefined && String(preview).trim()) {
+    return [{ label: 'Preview', value: preview }];
+  }
+
+  if (Array.isArray(fields) && fields.length) {
+    return fields.slice(0, 3).map(field => ({
+      label: formatFinanceFieldName(field),
+      value: 'field'
+    }));
+  }
+
+  return [{ label: 'Data group', value: description || 'Ready' }];
+}
+
+function compactFinanceLabel(label) {
+  const text = formatFinanceFieldName(label).toLowerCase();
+  if (text.includes('income')) return 'Income';
+  if (text.includes('expense') || text.includes('spending')) return 'Spend';
+  if (text.includes('saving') || text.includes('reserve')) return 'Reserve';
+  if (text.includes('loan') || text.includes('emi') || text.includes('payment')) return 'Payment';
+  if (text.includes('debt')) return 'DTI';
+  if (text.includes('credit')) return 'Score';
+  if (text.includes('employment')) return 'Employment';
+  if (text.includes('region')) return 'Region';
+  if (text.includes('date')) return 'Date';
+  if (text.includes('age')) return 'Age';
+  return formatFinanceFieldName(label).split(' ').slice(0, 2).join(' ') || 'Signal';
+}
+
+function financeVisualLevels(modalityId) {
+  const presets = {
+    income: [62, 82, 48],
+    expenses: [78, 54, 66],
+    savings: [35, 58, 88],
+    loan: [64],
+    credit: [72],
+    profile: [82, 58, 70]
+  };
+  return presets[modalityId] || [55, 72, 44];
+}
+
+function financeDateAxisLabels(count = 3) {
+  const base = new Date();
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(base.getFullYear(), base.getMonth() - (count - 1 - index), base.getDate());
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${month}/${day}`;
+  });
+}
+
+function createFinanceBarsHTML(config, rows, variantClass) {
+  const levels = financeVisualLevels(config.id);
+  const dateLabels = financeDateAxisLabels(3);
+  const bars = levels.slice(0, 3).map((height, index) => {
+    const row = rows[index] || rows[rows.length - 1] || { label: `Signal ${index + 1}` };
+    const metricLabel = compactFinanceLabel(row.label);
+    return `
+      <span class="finance-bar" style="--h:${height}%" title="${escapeCardText(metricLabel)}">
+        <i></i>
+        <em class="finance-date-label">${escapeCardText(dateLabels[index])}</em>
+      </span>
+    `;
+  }).join('');
+
+  return `
+    <div class="finance-chart ${variantClass}" aria-hidden="true">
+      <div class="finance-chart-grid"></div>
+      <div class="finance-bars">${bars}</div>
+    </div>
+  `;
+}
+
+function createFinanceGaugeHTML(config, rows, label) {
+  const value = financeVisualLevels(config.id)[0];
+  const caption = rows[0] ? compactFinanceLabel(rows[0].label) : label;
+  return `
+    <div class="finance-gauge-wrap" aria-hidden="true">
+      <div class="finance-gauge" style="--gauge:${value * 3.6}deg">
+        <span>Risk</span>
+      </div>
+      <div class="finance-gauge-meta">
+        <strong>${escapeCardText(label)}</strong>
+        <span>${escapeCardText(caption)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function createFinanceCreditHTML(config, rows) {
+  const value = financeVisualLevels(config.id)[0];
+  const labels = rows.slice(0, 2).map(row => compactFinanceLabel(row.label));
+  return `
+    <div class="finance-credit-chart" aria-hidden="true">
+      <div class="finance-credit-band">
+        <span class="finance-credit-marker" style="left:${value}%"></span>
+      </div>
+      <div class="finance-credit-scale">
+        <span>300</span>
+        <strong>${escapeCardText(labels[0] || 'Score')}</strong>
+        <span>850</span>
+      </div>
+      <div class="finance-credit-tags">
+        ${(labels.length ? labels : ['Score', 'DTI']).map(item => `<em>${escapeCardText(item)}</em>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function createFinanceProfileHTML(rows) {
+  const labels = rows.slice(0, 3).map(row => compactFinanceLabel(row.label));
+  const chipHtml = (labels.length ? labels : ['Employment', 'Region', 'Date']).map((label, index) => `
+    <span class="finance-profile-chip" style="--i:${index}">
+      <i></i>${escapeCardText(label)}
+    </span>
+  `).join('');
+
+  return `
+    <div class="finance-profile-map" aria-hidden="true">
+      <div class="finance-profile-orbit">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="finance-profile-chips">${chipHtml}</div>
+    </div>
+  `;
+}
+
+function createFinancePreviewHTML(modalityData, config) {
+  const rows = normalizeFinancePreviewRows(
+    modalityData && modalityData.preview,
+    (modalityData && modalityData.fields) || config.fields,
+    (modalityData && modalityData.description) || config.description
+  );
+  const visualByType = {
+    income: createFinanceBarsHTML(config, rows, 'finance-chart-income'),
+    expenses: createFinanceBarsHTML(config, rows, 'finance-chart-expenses'),
+    savings: createFinanceBarsHTML(config, rows, 'finance-chart-savings'),
+    loan: createFinanceGaugeHTML(config, rows, 'Loan stress'),
+    credit: createFinanceCreditHTML(config, rows),
+    profile: createFinanceProfileHTML(rows)
+  };
+  const visualHtml = visualByType[config.id] || createFinanceBarsHTML(config, rows, 'finance-chart-generic');
+
+  return `
+    <div class="card-visual finance-card-preview" style="--finance-color: ${escapeCardText(config.color)}">
+      ${visualHtml}
+    </div>
+  `;
+}
+
 // ========== 统一卡片生成器 ==========
 
 function createModalityCard(modalityKey, modalityData) {
@@ -405,20 +650,55 @@ function createModalityCard(modalityKey, modalityData) {
 
   const cardId = `modality-${config.id}`;
   const uploaded = Boolean(modalityData && modalityData.uploaded && modalityData.thumbnail);
+  const defaultThumbnail = Boolean(!uploaded && modalityData && modalityData.thumbnail);
   const uploadedAttr = uploaded ? 'data-uploaded="true"' : 'data-uploaded="false"';
+  const showReplaceButton = config.type !== 'finance' && (
+    uploaded ||
+    defaultThumbnail ||
+    config.type === 'timeseries' ||
+    config.type === 'skeleton'
+  );
+  const replaceButton = showReplaceButton
+    ? `<button class="modality-replace-btn" type="button" data-modality-upload="${config.id}">Replace</button>`
+    : '';
 
   let visualContent = '';
 
-  if (uploaded) {
+  if (config.type === 'finance') {
+    visualContent = createFinancePreviewHTML(modalityData, config);
+    console.log(`💳 ${modalityKey} 卡片生成: 使用财务预览`);
+  } else if (uploaded) {
     visualContent = `
       <div class="card-visual">
-        <button class="modality-replace-btn" type="button" data-modality-upload="${config.id}">Replace</button>
         <img src="data:image/png;base64,${modalityData.thumbnail}"
              alt="${config.name}"
              class="card-thumbnail" />
       </div>
     `;
     console.log(`✅ ${modalityKey} 卡片生成: 使用上传图片`);
+  } else if (config.type === 'image' && defaultThumbnail) {
+    visualContent = `
+      <div class="card-visual" data-default-preview="true">
+        <img src="data:image/png;base64,${escapeCardText(modalityData.thumbnail)}"
+             alt="${config.name}"
+             class="card-thumbnail" />
+      </div>
+    `;
+    console.log(`✅ ${modalityKey} 卡片生成: 使用默认缩略图`);
+  } else if (config.type === 'timeseries') {
+    visualContent = `
+      <div class="card-visual" data-default-preview="true">
+        <canvas id="${cardId}-canvas" class="card-canvas"></canvas>
+      </div>
+    `;
+    console.log(`🎨 ${modalityKey} 卡片生成: 使用默认时序Canvas`);
+  } else if (config.type === 'skeleton') {
+    visualContent = `
+      <div class="card-visual" data-default-preview="true">
+        <canvas id="${cardId}-canvas" class="skeleton-canvas"></canvas>
+      </div>
+    `;
+    console.log(`🎨 ${modalityKey} 卡片生成: 使用默认骨架Canvas`);
   } else {
     visualContent = `
       <div class="card-visual">
@@ -433,9 +713,10 @@ function createModalityCard(modalityKey, modalityData) {
 
   return `
     <div class="modality-card" id="${cardId}" data-modality="${modalityKey}" ${uploadedAttr}>
+      ${replaceButton}
       <div class="card-title">${config.name}</div>
       ${visualContent}
-      <input class="modality-upload-input" type="file" accept="image/*" data-modality-file="${config.id}" hidden />
+      ${config.type === 'finance' ? '' : `<input class="modality-upload-input" type="file" accept="image/*" data-modality-file="${config.id}" hidden />`}
     </div>
   `;
 }

@@ -9,6 +9,7 @@ import time
 import base64
 import tempfile
 import random
+import copy
 import uuid
 from io import BytesIO
 from typing import Dict, Any, Optional, List
@@ -47,12 +48,114 @@ DATA_PATHS = {
     "Blood": os.path.join(BASE_DIR, "test_data", "blood_sample.npz"),
 }
 
+SUPPORTED_SCENARIOS = {"healthcare", "finance"}
+DEFAULT_SCENARIO = "healthcare"
+
+FINANCE_DATA_PATH = os.path.join(BASE_DIR, "test_data", "synthetic_personal_finance_dataset.csv")
+
+FINANCE_REQUIRED_FIELDS = [
+    "user_id",
+    "age",
+    "gender",
+    "education_level",
+    "employment_status",
+    "job_title",
+    "monthly_income_usd",
+    "monthly_expenses_usd",
+    "savings_usd",
+    "has_loan",
+    "loan_type",
+    "loan_amount_usd",
+    "loan_term_months",
+    "monthly_emi_usd",
+    "loan_interest_rate_pct",
+    "debt_to_income_ratio",
+    "credit_score",
+    "savings_to_income_ratio",
+    "region",
+    "record_date",
+]
+
+FINANCE_MODALITIES = [
+    {
+        "id": "income",
+        "name": "Income",
+        "type": "finance",
+        "data_type": "numeric",
+        "description": "Monthly income and earning capacity baseline",
+        "icon": "income",
+        "fields": ["monthly_income_usd"],
+    },
+    {
+        "id": "expenses",
+        "name": "Expenses",
+        "type": "finance",
+        "data_type": "numeric",
+        "description": "Monthly spending burden",
+        "icon": "expenses",
+        "fields": ["monthly_expenses_usd"],
+    },
+    {
+        "id": "savings",
+        "name": "Savings",
+        "type": "finance",
+        "data_type": "numeric",
+        "description": "Savings buffer and liquidity resilience",
+        "icon": "savings",
+        "fields": ["savings_usd", "savings_to_income_ratio"],
+    },
+    {
+        "id": "loan",
+        "name": "Loan",
+        "type": "finance",
+        "data_type": "mixed",
+        "description": "Loan balance, monthly payment, term, and interest pressure",
+        "icon": "loan",
+        "fields": [
+            "has_loan",
+            "loan_type",
+            "loan_amount_usd",
+            "loan_term_months",
+            "monthly_emi_usd",
+            "loan_interest_rate_pct",
+        ],
+    },
+    {
+        "id": "credit",
+        "name": "Credit",
+        "type": "finance",
+        "data_type": "numeric",
+        "description": "Credit score and debt-to-income leverage",
+        "icon": "credit",
+        "fields": ["credit_score", "debt_to_income_ratio"],
+    },
+    {
+        "id": "profile",
+        "name": "Profile",
+        "type": "finance",
+        "data_type": "categorical",
+        "description": "Employment and regional context for explanation",
+        "icon": "profile",
+        "fields": ["age", "employment_status", "job_title", "region", "record_date"],
+    },
+]
+
+FINANCE_CLUSTER_MODELS = [
+    {"id": "income_capacity", "title": "Income Capacity", "subtitle": "Income percentile model"},
+    {"id": "expense_burden", "title": "Expense Burden", "subtitle": "Cashflow burden model"},
+    {"id": "savings_resilience", "title": "Savings Resilience", "subtitle": "Liquidity buffer model"},
+    {"id": "loan_stress", "title": "Loan Stress", "subtitle": "Repayment pressure model"},
+    {"id": "credit_risk", "title": "Credit Risk", "subtitle": "Credit and leverage model"},
+    {"id": "profile_context", "title": "Profile Context", "subtitle": "Employment context model"},
+]
+
 ASSET_USER_DIR = os.path.join(BASE_DIR, "frontend", "assets", "user")
 USER_UPLOAD_DIR = os.path.join(ASSET_USER_DIR, "uploads")
 DEPTH_PNG_PATH = os.path.join(ASSET_USER_DIR, "deep2.png")
 RGB_PNG_PATH = os.path.join(ASSET_USER_DIR, "RGB.png")
 
 _DATA_CACHE: Dict[str, np.ndarray] = {}
+_FINANCE_DATA_CACHE: Optional[List[Dict[str, str]]] = None
 _THUMBNAIL_CACHE: Dict[str, str] = {}  # Cache for generated thumbnails - 清空缓存以重新生成缩略图
 _STAGED_SESSIONS: Dict[str, Dict[str, Any]] = {}
 MODALITY_CONFIG = {
@@ -129,6 +232,20 @@ def normalize_modality_name(name: str) -> str:
     """将模态完整名称转换为后端get_data函数期望的简化名称"""
     return MODALITY_NAME_MAP.get(name, name)
 
+
+def normalize_scenario(scenario: Optional[str]) -> str:
+    if scenario is None or not str(scenario).strip():
+        return DEFAULT_SCENARIO
+    normalized = str(scenario).strip().lower()
+    if normalized not in SUPPORTED_SCENARIOS:
+        raise ValueError(f"Unsupported scenario: {scenario}")
+    return normalized
+
+
+def unsupported_scenario_payload(error: ValueError) -> Dict[str, str]:
+    return {"error": str(error)}
+
+
 # 智谱AI配置
 ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY", "")
 ZHIPU_API_URL = os.getenv("ZHIPU_API_URL", "https://open.bigmodel.cn/api/anthropic/v1/messages")
@@ -191,8 +308,9 @@ LLM_PROVIDER_OPTIONS = {
         "api_key_env": "XIAOMI_MIMO_API_KEY",
         "base_url_env": "XIAOMI_MIMO_BASE_URL",
         "model_env": "XIAOMI_MIMO_MODEL",
-        "default_base_url": "",
-        "default_model": "mimo",
+        "default_api_key": "sk-cckz9k7x2x3419381mm1hqqxld616ziso3yk85dcdsbyes1p",
+        "default_base_url": "https://api.xiaomimimo.com/v1/chat/completions",
+        "default_model": "mimo-v2-flash",
     },
 }
 
@@ -479,6 +597,58 @@ def _load_csv_matrix(path: str) -> np.ndarray:
             return np.loadtxt(path, delimiter=",", skiprows=1, dtype=float)
         return np.loadtxt(path, delimiter=",", dtype=float)
     return np.loadtxt(path, delimiter=None, dtype=float)
+
+
+def load_finance_records() -> List[Dict[str, str]]:
+    global _FINANCE_DATA_CACHE
+    if _FINANCE_DATA_CACHE is not None:
+        return _FINANCE_DATA_CACHE
+    if not os.path.exists(FINANCE_DATA_PATH):
+        raise FileNotFoundError(f"Finance data file missing: {FINANCE_DATA_PATH}")
+    import csv
+    with open(FINANCE_DATA_PATH, "r", encoding="utf-8", newline="") as handle:
+        records = list(csv.DictReader(handle))
+    _FINANCE_DATA_CACHE = records
+    return records
+
+
+def validate_finance_records(records: List[Dict[str, str]]) -> None:
+    if not records:
+        raise ValueError("Finance dataset is empty")
+    missing = [field for field in FINANCE_REQUIRED_FIELDS if field not in records[0]]
+    if missing:
+        raise ValueError(f"Missing finance dataset fields: {', '.join(missing)}")
+
+
+def safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    if np.isnan(parsed) or np.isinf(parsed):
+        return default
+    return parsed
+
+
+def safe_ratio(numerator: Any, denominator: Any) -> float:
+    den = safe_float(denominator)
+    if abs(den) < 1e-9:
+        return 0.0
+    return safe_float(numerator) / den
+
+
+def conservative_ratio_risk(numerator: Any, denominator: Any) -> float:
+    num = max(safe_float(numerator), 0.0)
+    den = safe_float(denominator)
+    if den <= 0:
+        return 1.3 if num > 0 else 0.0
+    return num / den
+
+
+def pick_finance_record(records: List[Dict[str, str]], seed: int) -> Dict[str, str]:
+    validate_finance_records(records)
+    index = seed % len(records)
+    return records[index]
 
 def get_data(name: str) -> np.ndarray:
     """加载模态数据，支持真实数据和模拟数据"""
@@ -1553,7 +1723,7 @@ async def call_selected_llm(prompt: str, provider: Optional[str], max_tokens: in
 
     config = LLM_PROVIDER_OPTIONS[provider_key]
     label = config["label"]
-    api_key = os.getenv(config["api_key_env"], "")
+    api_key = os.getenv(config["api_key_env"], config.get("default_api_key", ""))
     base_url = os.getenv(config["base_url_env"], config["default_base_url"])
     model = os.getenv(config["model_env"], config["default_model"])
 
@@ -1570,7 +1740,7 @@ async def call_selected_llm(prompt: str, provider: Optional[str], max_tokens: in
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
             response = await client.post(base_url, headers=headers, json=payload)
             response.raise_for_status()
             result = response.json()
@@ -1590,8 +1760,19 @@ async def health_check():
     return {"status": "healthy", "version": "3.1-complete", "timestamp": time.time()}
 
 @app.get("/api/modalities")
-async def get_modalities():
+async def get_modalities(scenario: Optional[str] = None):
     """获取所有可用的模态配置，包括文件信息"""
+    try:
+        scenario_key = normalize_scenario(scenario)
+    except ValueError as exc:
+        return unsupported_scenario_payload(exc)
+
+    if scenario_key == "finance":
+        return {
+            "scenario": "finance",
+            "modalities": [dict(item) for item in FINANCE_MODALITIES],
+        }
+
     try:
         config_path = os.path.join(BASE_DIR, "backend", "modality_config.json")
         with open(config_path, 'r', encoding='utf-8') as f:
@@ -1605,7 +1786,10 @@ async def get_modalities():
             file_info = get_modality_file_info(modality_id, test_data_dir)
             modality["files"] = file_info
 
-        return config
+        return {
+            **config,
+            "scenario": "healthcare",
+        }
 
     except Exception as e:
         # 如果配置文件不存在，返回默认配置
@@ -1631,7 +1815,10 @@ async def get_modalities():
             file_info = get_modality_file_info(modality_id, test_data_dir)
             modality["files"] = file_info
 
-        return default_config
+        return {
+            **default_config,
+            "scenario": "healthcare",
+        }
 
 def get_modality_file_info(modality_id: str, test_data_dir: str) -> list:
     """获取指定模态的可用文件列表"""
@@ -1865,6 +2052,22 @@ def _selected_flags(selected_modalities: Optional[str]) -> Dict[str, Any]:
         "blood": find_selected_modality(enabled_modalities, "Blood"),
     }
 
+
+FINANCE_MODALITY_BY_ID = {item["id"]: item for item in FINANCE_MODALITIES}
+FINANCE_MODALITY_NAME_BY_ID = {item["id"]: item["name"] for item in FINANCE_MODALITIES}
+
+
+def resolve_finance_modalities(selected_modalities: Optional[str]) -> List[str]:
+    default_ids = [item["id"] for item in FINANCE_MODALITIES]
+    if not selected_modalities:
+        return default_ids
+    resolved = []
+    for raw_item in selected_modalities.split(","):
+        item_id = raw_item.strip().lower()
+        if item_id in FINANCE_MODALITY_BY_ID and item_id not in resolved:
+            resolved.append(item_id)
+    return resolved or default_ids
+
 def _build_step1(flags: Dict[str, Any]) -> Dict[str, Any]:
     step_start = time.time()
     uwb_data = get_data("UWB") if flags["uwb"] else None
@@ -1982,6 +2185,51 @@ def _build_assignments(flags: Dict[str, Any]) -> List[Dict[str, str]]:
         {"input_modality": "UWB Radar", "model_id": "bp", "tool": "secure_bp_toolbox"},
     ]
 
+
+def finance_status_from_risk(risk: float) -> str:
+    if risk >= 0.70:
+        return "attention"
+    if risk >= 0.40:
+        return "watch"
+    return "stable"
+
+
+def finance_score_for_model(model_id: str, record: Dict[str, str]) -> Dict[str, Any]:
+    income = max(safe_float(record.get("monthly_income_usd")), 0.0)
+    expenses = max(safe_float(record.get("monthly_expenses_usd")), 0.0)
+    savings = max(safe_float(record.get("savings_usd")), 0.0)
+    emi = max(safe_float(record.get("monthly_emi_usd")), 0.0)
+    interest = max(safe_float(record.get("loan_interest_rate_pct")), 0.0)
+    debt_to_income = max(safe_float(record.get("debt_to_income_ratio")), 0.0)
+    credit_score = safe_float(record.get("credit_score"), 600.0)
+    savings_to_income = max(safe_float(record.get("savings_to_income_ratio")), 0.0)
+
+    expense_ratio = conservative_ratio_risk(expenses, income)
+    emi_ratio = conservative_ratio_risk(emi, income)
+    credit_risk = _clamp((680.0 - credit_score) / 380.0, 0.0, 1.0)
+
+    if model_id == "income_capacity":
+        score = _clamp(income / 8000.0, 0.0, 1.0) * 100
+        return {"score": round(score, 2), "status": "stable" if score >= 45 else "watch"}
+    if model_id == "expense_burden":
+        risk = _clamp(expense_ratio, 0.0, 1.2)
+        return {"score": round(_clamp(risk * 100, 0.0, 100.0), 2), "status": finance_status_from_risk(risk)}
+    if model_id == "savings_resilience":
+        resilience = _clamp(min(savings_to_income / 6.0, savings / max(income, 1.0) / 12.0), 0.0, 1.0)
+        return {"score": round(resilience * 100, 2), "status": "stable" if resilience >= 0.55 else "watch"}
+    if model_id == "loan_stress":
+        risk = _clamp(0.55 * emi_ratio + 0.30 * debt_to_income + 0.15 * (interest / 30.0), 0.0, 1.0)
+        return {"score": round(risk * 100, 2), "status": finance_status_from_risk(risk)}
+    if model_id == "credit_risk":
+        risk = _clamp(0.65 * credit_risk + 0.35 * min(debt_to_income / 2.0, 1.0), 0.0, 1.0)
+        return {"score": round(risk * 100, 2), "status": finance_status_from_risk(risk)}
+    if model_id == "profile_context":
+        employed = str(record.get("employment_status", "")).strip().lower() == "employed"
+        score = 75.0 if employed else 55.0
+        return {"score": score, "status": "stable" if employed else "watch"}
+    return {"score": 50.0, "status": "watch"}
+
+
 def _score_for_model(model_id: str) -> Dict[str, Any]:
     scores = {
         "ecg": (75.5, "normal"),
@@ -2039,6 +2287,632 @@ def _build_step2(flags: Dict[str, Any], series: Dict[str, Optional[np.ndarray]])
         },
         "raw_results": results,
     }
+
+
+def _finance_excerpt(record: Dict[str, str], fields: List[str]) -> str:
+    parts = []
+    for field in fields:
+        value = record.get(field, "")
+        parts.append(f"{field}={value}")
+    return "; ".join(parts)
+
+
+def _build_finance_step1(record: Dict[str, str], selected_ids: List[str]) -> Dict[str, Any]:
+    step_start = time.time()
+    modalities = {}
+    for item_id in selected_ids:
+        config = FINANCE_MODALITY_BY_ID[item_id]
+        fields = config["fields"]
+        modalities[config["name"]] = {
+            "kind": "finance",
+            "type": "finance",
+            "shape": f"{len(fields)} fields",
+            "fields": fields,
+            "plaintext_excerpt": _finance_excerpt(record, fields),
+            "preview": {field: record.get(field) for field in fields},
+        }
+    return {
+        "time_sec": time.time() - step_start,
+        "modalities": modalities,
+        "enabled_modalities": [FINANCE_MODALITY_NAME_BY_ID[item_id] for item_id in selected_ids],
+    }
+
+
+def _build_finance_assignments(selected_ids: List[str]) -> List[Dict[str, str]]:
+    pairs = [
+        ("income", "income_capacity", "secure_income_toolbox"),
+        ("expenses", "expense_burden", "secure_expense_toolbox"),
+        ("savings", "savings_resilience", "secure_savings_toolbox"),
+        ("loan", "loan_stress", "secure_loan_toolbox"),
+        ("credit", "credit_risk", "secure_credit_toolbox"),
+        ("profile", "profile_context", "secure_profile_toolbox"),
+    ]
+    return [
+        {"input_modality": FINANCE_MODALITY_NAME_BY_ID[item_id], "model_id": model_id, "tool": tool}
+        for item_id, model_id, tool in pairs
+        if item_id in selected_ids
+    ]
+
+
+def _build_finance_step2(record: Dict[str, str], selected_ids: List[str]) -> Dict[str, Any]:
+    step_start = time.time()
+    features = np.array([
+        safe_float(record.get("monthly_income_usd")),
+        safe_float(record.get("monthly_expenses_usd")),
+        safe_float(record.get("savings_usd")),
+        safe_float(record.get("monthly_emi_usd")),
+        safe_float(record.get("debt_to_income_ratio")),
+        safe_float(record.get("credit_score")),
+        safe_float(record.get("savings_to_income_ratio")),
+        safe_float(record.get("loan_interest_rate_pct")),
+    ], dtype=float)
+    ctx = setup_context()
+    enc_features = ts.ckks_vector(ctx, features.tolist())
+    agg_bytes = enc_features.serialize()
+
+    assignments = _build_finance_assignments(selected_ids)
+    results = []
+    for assignment in assignments:
+        model_meta = next((item for item in FINANCE_CLUSTER_MODELS if item["id"] == assignment["model_id"]), None)
+        scored = finance_score_for_model(assignment["model_id"], record)
+        results.append({
+            "model": model_meta["title"] if model_meta else assignment["model_id"],
+            "model_id": assignment["model_id"],
+            "input_modality": assignment["input_modality"],
+            "tool": assignment["tool"],
+            "score": scored["score"],
+            "status": scored["status"],
+        })
+
+    return {
+        "step2": {
+            "time_sec": time.time() - step_start,
+            "llm_time_sec": 0.0,
+            "summary": ", ".join([f"{item['input_modality']}→{item['tool']}" for item in assignments]),
+            "cluster_models": FINANCE_CLUSTER_MODELS,
+            "assignments": assignments,
+            "tool_times": [0.6 for _ in assignments],
+            "aggregate_cipher_preview": bytes_preview(agg_bytes, 160),
+        },
+        "raw_results": results,
+    }
+
+
+def _bucket_label(value, low_label="low", mid_label="watch", high_label="attention"):
+    numeric_value = _clamp(safe_float(value), 0.0, 1.0)
+    if numeric_value >= 0.70:
+        return high_label
+    if numeric_value >= 0.40:
+        return mid_label
+    return low_label
+
+
+def _finance_metric(name: str, value: float, unit: str, ref: str, status: str, detail: str = "") -> Dict[str, Any]:
+    return {
+        "name": name,
+        "value": float(value),
+        "unit": unit,
+        "ref": ref,
+        "status": status,
+        "detail": detail,
+    }
+
+
+def build_finance_report(raw_results, record, selected_modalities):
+    modality_items = (
+        selected_modalities.split(",")
+        if isinstance(selected_modalities, str)
+        else (selected_modalities or [])
+    )
+    selected_ids = [
+        str(item).strip().lower()
+        for item in modality_items
+        if str(item).strip()
+    ]
+    income = max(safe_float(record.get("monthly_income_usd")), 0.0)
+    expenses = max(safe_float(record.get("monthly_expenses_usd")), 0.0)
+    savings = max(safe_float(record.get("savings_usd")), 0.0)
+    monthly_emi = max(safe_float(record.get("monthly_emi_usd")), 0.0)
+    credit_score = safe_float(record.get("credit_score"), 600.0)
+    debt_to_income_ratio = max(safe_float(record.get("debt_to_income_ratio")), 0.0)
+    savings_to_income_ratio = max(safe_float(record.get("savings_to_income_ratio")), 0.0)
+    interest = max(safe_float(record.get("loan_interest_rate_pct")), 0.0)
+
+    expense_ratio = conservative_ratio_risk(expenses, income)
+    emi_ratio = conservative_ratio_risk(monthly_emi, income)
+    cashflow_burden = _clamp(expense_ratio, 0.0, 1.0)
+    loan_stress = _clamp(0.55 * emi_ratio + 0.30 * debt_to_income_ratio + 0.15 * (interest / 30.0), 0.0, 1.0)
+    credit_risk = _clamp(0.65 * ((680.0 - credit_score) / 380.0) + 0.35 * min(debt_to_income_ratio / 2.0, 1.0), 0.0, 1.0)
+    savings_resilience = _clamp(
+        min(savings_to_income_ratio / 6.0, savings / max(income, 1.0) / 12.0),
+        0.0,
+        1.0,
+    )
+    combined_risk = _clamp(
+        0.35 * cashflow_burden
+        + 0.30 * loan_stress
+        + 0.20 * credit_risk
+        + 0.15 * (1.0 - savings_resilience),
+        0.0,
+        1.0,
+    )
+    financial_resilience = _clamp(1.0 - combined_risk, 0.0, 1.0)
+    overall_status = finance_status_from_risk(combined_risk)
+    overall = {"stable": "Stable", "watch": "Watch", "attention": "Attention"}.get(overall_status, "Watch")
+
+    credit_status = "attention" if credit_score < 580 else "watch" if credit_score < 670 else "stable"
+    savings_status = "stable" if savings_resilience >= 0.55 else "watch" if savings_resilience >= 0.30 else "attention"
+    metrics = [
+        _finance_metric("Expense burden", cashflow_burden * 100, "%", "<40", _bucket_label(cashflow_burden, "stable"), "Monthly expenses relative to income"),
+        _finance_metric("Savings resilience", savings_resilience * 100, "%", ">=55", savings_status, "Savings buffer scaled by income"),
+        _finance_metric("Loan stress", loan_stress * 100, "%", "<40", _bucket_label(loan_stress, "stable"), "Repayment pressure and leverage"),
+        _finance_metric("Credit standing", credit_score, "score", "670+", credit_status, "Credit score band"),
+        _finance_metric("Debt to income", debt_to_income_ratio, "ratio", "<0.40", _bucket_label(min(debt_to_income_ratio, 1.0), "stable"), "Debt load relative to income"),
+    ]
+    metric_by_name = {item["name"]: item for item in metrics}
+
+    drivers = []
+    if cashflow_burden >= 0.70:
+        drivers.append("High expense burden")
+    elif cashflow_burden >= 0.40:
+        drivers.append("Expense burden needs monitoring")
+    if loan_stress >= 0.70:
+        drivers.append("Repayment pressure is elevated")
+    elif loan_stress >= 0.40:
+        drivers.append("Loan affordability is in watch range")
+    if credit_status != "stable":
+        drivers.append("Credit standing is below preferred band")
+    if savings_status != "stable":
+        drivers.append("Savings buffer is limited")
+    if not drivers:
+        drivers.append("No dominant finance risk driver detected in this demo cycle")
+
+    radar_labels = ["Resilience", "Cashflow", "Savings", "Loan", "Credit"]
+    radar_values = [
+        financial_resilience * 100,
+        (1.0 - cashflow_burden) * 100,
+        savings_resilience * 100,
+        (1.0 - loan_stress) * 100,
+        (1.0 - credit_risk) * 100,
+    ]
+
+    selected_sources = selected_ids or [item["id"] for item in FINANCE_MODALITIES]
+    sections = [
+        {
+            "id": "integrated_financial_risk",
+            "title": "Integrated Financial Risk",
+            "status": overall.lower(),
+            "priority": 95,
+            "source_modalities": selected_sources,
+            "chart_type": "radar",
+            "chart": {"labels": radar_labels, "values": [float(value) for value in radar_values]},
+            "metrics": [
+                _finance_metric("Financial resilience", financial_resilience * 100, "%", "70-100", "stable" if financial_resilience >= 0.70 else "watch"),
+                _finance_metric("Data coverage", len(selected_sources), "modalities", "2+", "stable"),
+            ],
+            "insight": "Selected finance signals are summarized into a protected finance risk profile.",
+            "expanded": True,
+        },
+        {
+            "id": "cashflow_balance",
+            "title": "Cashflow Balance",
+            "status": _bucket_label(cashflow_burden, "stable"),
+            "priority": 80,
+            "source_modalities": [item for item in ["income", "expenses", "savings"] if item in selected_sources],
+            "chart_type": "reference_bars",
+            "chart": {
+                "labels": ["Expense burden", "Savings resilience"],
+                "values": [cashflow_burden * 100, savings_resilience * 100],
+                "ranges": {"Expense burden": [0, 40], "Savings resilience": [55, 100]},
+            },
+            "metrics": [metric_by_name["Expense burden"], metric_by_name["Savings resilience"]],
+            "insight": "Cashflow balance compares spending pressure with savings buffer.",
+            "expanded": True,
+        },
+        {
+            "id": "loan_affordability",
+            "title": "Loan Affordability",
+            "status": _bucket_label(loan_stress, "stable"),
+            "priority": 75,
+            "source_modalities": [item for item in ["loan", "credit"] if item in selected_sources],
+            "chart_type": "reference_bars",
+            "chart": {
+                "labels": ["Loan stress", "Debt to income", "Credit standing"],
+                "values": [loan_stress * 100, min(debt_to_income_ratio * 100, 100), _clamp((credit_score - 300) / 5.5, 0.0, 100.0)],
+            },
+            "metrics": [metric_by_name["Loan stress"], metric_by_name["Credit standing"], metric_by_name["Debt to income"]],
+            "insight": "Repayment pressure is reviewed with leverage and credit standing.",
+            "expanded": True,
+        },
+    ]
+    compact_sections = []
+
+    missing_signals = []
+    for item in FINANCE_MODALITIES:
+        if item["id"] not in selected_sources:
+            missing_signals.append({
+                "theme_id": item["id"],
+                "title": item["name"],
+                "missing_modalities": [item["id"]],
+                "message": f"Add {item['name']} to improve the finance risk view.",
+            })
+
+    recommendations = [
+        "Keep repayments affordable relative to monthly income.",
+        "Build or preserve emergency savings before increasing discretionary commitments.",
+        "Review high-interest debt and prioritize lower-cost repayment options where appropriate.",
+        "This demo is not financial advice; do not use it as tax, legal, investment, or lending advice.",
+    ]
+    if overall == "Attention":
+        recommendations.insert(0, "Attention: reduce avoidable cashflow pressure and review repayment exposure before taking on new obligations.")
+    elif overall == "Watch":
+        recommendations.insert(0, "Watch: monitor spending, savings buffer, and loan affordability before making larger finance decisions.")
+
+    narrative = (
+        f"Overall status: {overall}. Financial resilience estimate: {financial_resilience:.2f}. "
+        f"Key drivers: {'; '.join(drivers[:3])}. "
+        "Interpretation is based on synthetic personal finance signals for this privacy demo."
+    )
+
+    return {
+        "domain": "finance",
+        "score_label": "Financial resilience",
+        "overall": overall,
+        "disclaimer": "Demo output only - not financial advice.",
+        "fall_risk": {
+            "probability": float(combined_risk),
+            "level": overall,
+            "drivers": drivers[:4],
+        },
+        "summary": {
+            "title": "Financial Risk Summary",
+            "health_index": float(financial_resilience),
+            "overall": overall,
+            "drivers": drivers[:4],
+            "coverage": {
+                "selected_modalities": selected_sources,
+                "available_theme_count": len(sections),
+                "total_theme_count": 3,
+            },
+        },
+        "sections": sections,
+        "compact_sections": compact_sections,
+        "missing_signals": missing_signals,
+        "metrics": metrics,
+        "recommendations": recommendations,
+        "narrative": narrative,
+        "charts": {
+            "radar": {"labels": radar_labels, "values": [float(value) for value in radar_values]},
+            "cashflow": {
+                "labels": ["Income", "Expenses", "Savings", "Monthly EMI"],
+                "values": [float(income), float(expenses), float(savings), float(monthly_emi)],
+            },
+            "burden": {
+                "labels": ["Expense burden", "Loan stress", "Credit risk"],
+                "values": [float(cashflow_burden * 100), float(loan_stress * 100), float(credit_risk * 100)],
+            },
+        },
+    }
+
+
+def _metric_value(raw_report: Dict[str, Any], name: str, default: float = 0.0) -> float:
+    for metric in raw_report.get("metrics", []):
+        if metric.get("name") == name:
+            return safe_float(metric.get("value"), default)
+    return default
+
+
+def _build_finance_real_data_record(raw_results, raw_report, record):
+    return {
+        "kind": "real",
+        "domain": "finance",
+        "label": "Real Finance Record",
+        "risk_bucket": str(raw_report.get("overall", "Watch")).lower(),
+        "overall": raw_report.get("overall", "Watch"),
+        "model_outputs": copy.deepcopy(raw_results),
+        "derived_metrics": {
+            "financial_resilience": safe_float(raw_report.get("summary", {}).get("health_index")),
+            "savings_resilience": _metric_value(raw_report, "Savings resilience") / 100.0,
+            "cashflow_burden": _metric_value(raw_report, "Expense burden") / 100.0,
+            "loan_stress": _metric_value(raw_report, "Loan stress") / 100.0,
+            "credit_standing": safe_float(record.get("credit_score")),
+            "debt_to_income": safe_float(record.get("debt_to_income_ratio")),
+        },
+    }
+
+
+def _finance_record_risk_score(metrics: Dict[str, Any]) -> float:
+    financial_resilience = _clamp(safe_float(metrics.get("financial_resilience"), 0.5), 0.0, 1.0)
+    savings_resilience = _clamp(safe_float(metrics.get("savings_resilience"), financial_resilience), 0.0, 1.0)
+    cashflow_burden = _clamp(safe_float(metrics.get("cashflow_burden"), 0.5), 0.0, 1.0)
+    loan_stress = _clamp(safe_float(metrics.get("loan_stress"), 0.5), 0.0, 1.0)
+    debt_to_income = _clamp(safe_float(metrics.get("debt_to_income"), 0.0) / 2.0, 0.0, 1.0)
+    credit_risk = _clamp((680.0 - safe_float(metrics.get("credit_standing"), 620.0)) / 380.0, 0.0, 1.0)
+    return _clamp(
+        0.30 * cashflow_burden
+        + 0.30 * loan_stress
+        + 0.15 * (1.0 - financial_resilience)
+        + 0.10 * (1.0 - savings_resilience)
+        + 0.10 * debt_to_income
+        + 0.05 * credit_risk,
+        0.0,
+        1.0,
+    )
+
+
+def _finance_bucket_from_metrics(metrics: Dict[str, Any]) -> str:
+    return finance_status_from_risk(_finance_record_risk_score(metrics))
+
+
+def _finance_overall_from_bucket(bucket: str) -> str:
+    return {"stable": "Stable", "watch": "Watch", "attention": "Attention"}.get(bucket, "Watch")
+
+
+def _jitter_finance_model_outputs(raw_outputs: List[Dict[str, Any]], rng: random.Random) -> List[Dict[str, Any]]:
+    outputs = []
+    resilience_models = {"income_capacity", "savings_resilience", "profile_context"}
+    for output in raw_outputs:
+        output_copy = copy.deepcopy(output)
+        score = safe_float(output_copy.get("score"), 50.0)
+        jittered_score = round(_clamp(score + rng.uniform(-8.0, 8.0), 0.0, 100.0), 2)
+        model_id = str(output_copy.get("model_id", ""))
+        if model_id in resilience_models:
+            status = "stable" if jittered_score >= 55 else "watch" if jittered_score >= 35 else "attention"
+        else:
+            status = finance_status_from_risk(jittered_score / 100.0)
+        output_copy["score"] = jittered_score
+        output_copy["status"] = status
+        outputs.append(output_copy)
+    return outputs
+
+
+def _generate_finance_synthetic_database(real_record: Dict[str, Any], database_size: int, rng: random.Random) -> List[Dict[str, Any]]:
+    real_metrics = real_record.get("derived_metrics", {})
+    records = []
+    for index in range(database_size):
+        metrics = {
+            "financial_resilience": round(_clamp(rng.gauss(safe_float(real_metrics.get("financial_resilience"), 0.5), 0.12), 0.05, 0.95), 3),
+            "savings_resilience": round(_clamp(rng.gauss(safe_float(real_metrics.get("savings_resilience"), 0.5), 0.16), 0.02, 0.98), 3),
+            "cashflow_burden": round(_clamp(rng.gauss(safe_float(real_metrics.get("cashflow_burden"), 0.5), 0.15), 0.02, 0.98), 3),
+            "loan_stress": round(_clamp(rng.gauss(safe_float(real_metrics.get("loan_stress"), 0.5), 0.15), 0.02, 0.98), 3),
+            "credit_standing": round(_clamp(rng.gauss(safe_float(real_metrics.get("credit_standing"), 620.0), 80.0), 300.0, 850.0)),
+            "debt_to_income": round(_clamp(rng.gauss(safe_float(real_metrics.get("debt_to_income"), 0.6), 0.35), 0.0, 3.0), 2),
+        }
+        risk_bucket = _finance_bucket_from_metrics(metrics)
+        records.append({
+            "kind": "synthetic",
+            "domain": "finance",
+            "label": f"Synthetic Finance Record {index + 1}",
+            "risk_bucket": risk_bucket,
+            "overall": _finance_overall_from_bucket(risk_bucket),
+            "model_outputs": _jitter_finance_model_outputs(real_record.get("model_outputs", []), rng),
+            "derived_metrics": metrics,
+        })
+    return records
+
+
+def _finance_preview_record(record: Dict[str, Any], label: str) -> Dict[str, Any]:
+    metrics = record.get("derived_metrics", {})
+    outputs = record.get("model_outputs", [])
+    stable_count = sum(1 for output in outputs if str(output.get("status", "")).lower() == "stable")
+    resilience = safe_float(metrics.get("financial_resilience"), 0.5)
+    return {
+        "label": label,
+        "risk_bucket": record.get("risk_bucket", "watch"),
+        "status_mix": "stable dominant" if stable_count >= max(1, len(outputs) // 2) else "watch mixed",
+        "metric_shape": "resilient" if resilience >= 0.65 else "watch" if resilience >= 0.40 else "attention",
+    }
+
+
+def _build_finance_anonymous_database(real_record: Dict[str, Any], synthetic_records: List[Dict[str, Any]], rng: random.Random) -> Dict[str, Any]:
+    real_token = f"finance-real-{rng.randrange(10 ** 9)}"
+    tagged_real = copy.deepcopy(real_record)
+    tagged_real["_selection_token"] = real_token
+    combined = [copy.deepcopy(record) for record in synthetic_records] + [tagged_real]
+    rng.shuffle(combined)
+
+    anonymous_database = []
+    selected_record = None
+    selected_record_index = 0
+    for index, record_item in enumerate(combined):
+        anonymous_label = f"Synthetic Record {index + 1:02d}"
+        record_copy = copy.deepcopy(record_item)
+        record_copy["_anonymous_label"] = anonymous_label
+        anonymous_database.append(record_copy)
+        if record_copy.get("_selection_token") == real_token:
+            selected_record = record_copy
+            selected_record_index = index
+
+    if selected_record is None:
+        raise ValueError("finance real record token was not found after shuffling")
+
+    shuffle_order = [
+        record_item.get("_anonymous_label", f"Synthetic Record {index + 1:02d}")
+        for index, record_item in enumerate(anonymous_database)
+    ]
+    return {
+        "anonymous_database": anonymous_database,
+        "anonymous_database_preview": [
+            _finance_preview_record(record_item, record_item.get("_anonymous_label", f"Synthetic Record {index + 1:02d}"))
+            for index, record_item in enumerate(anonymous_database[:6])
+        ],
+        "shuffle_order_preview": shuffle_order,
+        "selected_record": selected_record,
+        "selected_record_label": selected_record.get("_anonymous_label", "Synthetic Record"),
+        "selected_record_index": selected_record_index,
+    }
+
+
+def _percentile_from_ordered(value: float, ordered_values: List[float]) -> float:
+    if not ordered_values:
+        return 0.5
+    if len(ordered_values) == 1:
+        return 0.5
+    index = min(max(np.searchsorted(ordered_values, value, side="left"), 0), len(ordered_values) - 1)
+    return _clamp(index / (len(ordered_values) - 1), 0.0, 1.0)
+
+
+def _finance_distribution_point(record: Dict[str, Any], label: str, index: int, loan_values: List[float], resilience_values: List[float], target: bool = False) -> Dict[str, Any]:
+    metrics = record.get("derived_metrics", {})
+    loan_stress = _clamp(safe_float(metrics.get("loan_stress"), 0.5), 0.0, 1.0)
+    savings_resilience = _clamp(safe_float(metrics.get("savings_resilience"), 0.5), 0.0, 1.0)
+    return {
+        "label": label,
+        "x": round(_percentile_from_ordered(loan_stress, loan_values), 3),
+        "y": round(_percentile_from_ordered(savings_resilience, resilience_values), 3),
+        "bucket": record.get("risk_bucket", _finance_bucket_from_metrics(metrics)),
+        "target": target,
+        "index": index,
+    }
+
+
+def _build_finance_distribution_summary(bundle: Dict[str, Any], max_points: int = 48) -> Dict[str, Any]:
+    records = bundle.get("anonymous_database", [])
+    selected_label = bundle.get("selected_record_label", "Synthetic Record")
+    synthetic_count = sum(1 for record in records if record.get("kind") == "synthetic")
+    bucket_names = ["stable", "watch", "attention"]
+    bucket_counts = {bucket: 0 for bucket in bucket_names}
+    for record in records:
+        bucket = record.get("risk_bucket")
+        if bucket not in bucket_counts:
+            bucket = _finance_bucket_from_metrics(record.get("derived_metrics", {}))
+            record["risk_bucket"] = bucket
+        bucket_counts[bucket] += 1
+
+    loan_values = sorted(
+        _clamp(safe_float(record.get("derived_metrics", {}).get("loan_stress"), 0.5), 0.0, 1.0)
+        for record in records
+    )
+    resilience_values = sorted(
+        _clamp(safe_float(record.get("derived_metrics", {}).get("savings_resilience"), 0.5), 0.0, 1.0)
+        for record in records
+    )
+
+    scatter_points = []
+    target_point = None
+    for index, record in enumerate(records):
+        label = record.get("_anonymous_label", f"Synthetic Record {index + 1:02d}")
+        is_target = label == selected_label
+        if len(scatter_points) < max_points or is_target:
+            point = _finance_distribution_point(record, label, index, loan_values, resilience_values, target=is_target)
+            scatter_points.append(point)
+            if is_target:
+                target_point = point
+
+    if target_point is None and bundle.get("selected_record"):
+        target_point = _finance_distribution_point(
+            bundle["selected_record"],
+            selected_label,
+            bundle.get("selected_record_index", 0),
+            loan_values,
+            resilience_values,
+            target=True,
+        )
+
+    total = len(records) or 1
+    return {
+        "database_size": len(records),
+        "synthetic_record_count": synthetic_count,
+        "risk_buckets": [
+            {
+                "bucket": bucket,
+                "count": bucket_counts.get(bucket, 0),
+                "ratio": round(bucket_counts.get(bucket, 0) / total, 3),
+            }
+            for bucket in bucket_names
+        ],
+        "scatter_points": scatter_points,
+        "target_point": target_point,
+        "axes": {
+            "x": "loan_stress_percentile",
+            "y": "savings_resilience_percentile",
+            "x_source": "loan_stress",
+            "y_source": "savings_resilience",
+        },
+        "token_flow": {
+            "token_label": "hidden backend token",
+            "generation": "H(session_seed, real_id, nonce)",
+            "binding": "token bound to real homomorphic finance inference record",
+            "lookup": "real_record = token_map[token]",
+            "visibility": "backend_only",
+        },
+    }
+
+
+def _build_finance_privacy(raw_results, raw_report, record, rng):
+    real_record = _build_finance_real_data_record(raw_results, raw_report, record)
+    synthetic_records = _generate_finance_synthetic_database(real_record, database_size=100, rng=rng)
+    anonymous_bundle = _build_finance_anonymous_database(real_record, synthetic_records, rng=rng)
+    protected_llm_summary = build_protected_llm_summary(anonymous_bundle["selected_record"])
+    distribution_summary = _build_finance_distribution_summary(anonymous_bundle)
+    return {
+        "protected_llm_summary": protected_llm_summary,
+        "privacy_protection": {
+            "enabled": True,
+            "method": "synthetic_database_shuffle",
+            "database_size": len(anonymous_bundle["anonymous_database"]),
+            "synthetic_record_count": distribution_summary["synthetic_record_count"],
+            "distribution_summary": {
+                "risk_buckets": distribution_summary["risk_buckets"],
+                "scatter_points": distribution_summary["scatter_points"],
+                "target_point": distribution_summary["target_point"],
+                "axes": distribution_summary["axes"],
+            },
+            "token_flow": distribution_summary["token_flow"],
+            "anonymous_database_preview": anonymous_bundle["anonymous_database_preview"],
+            "shuffle_order_preview": anonymous_bundle["shuffle_order_preview"],
+            "selected_record_label": anonymous_bundle["selected_record_label"],
+            "selected_record_index": anonymous_bundle["selected_record_index"],
+            "llm_summary_mode": "bucketed_non_trusted",
+            "protected_llm_summary_preview": protected_llm_summary,
+            "generation_policy": {
+                "distribution": "finance-risk-bucket conditioned",
+                "constraints": [
+                    "bucketed finance metrics",
+                    "anonymous peer shuffle",
+                    "non-trusted LLM receives no exact raw finance values",
+                ],
+            },
+            "summary": (
+                "Synthetic finance peers mask the real finance inference record before a bucketed "
+                "summary is sent to the non-trusted LLM."
+            ),
+        },
+    }
+
+
+def _build_finance_section_prompt_summary(raw_report: Dict[str, Any]) -> List[Dict[str, Any]]:
+    section_summaries = []
+    for section in (raw_report.get("sections") or [])[:3]:
+        metrics = [
+            metric.get("name")
+            for metric in (section.get("metrics") or [])
+            if isinstance(metric, dict) and metric.get("name")
+        ]
+        section_summaries.append({
+            "title": section.get("title"),
+            "status": section.get("status"),
+            "sources": section.get("source_modalities"),
+            "metric_names": metrics,
+        })
+    return section_summaries
+
+
+def _build_finance_llm_prompt(protected_llm_summary, raw_report):
+    section_summary = _build_finance_section_prompt_summary(raw_report)
+    return (
+        "You are a privacy-preserving personal finance risk analysis expert. "
+        "The external model can only see bucketed finance information from an anonymous synthetic-peer shuffle. "
+        "Do not provide tax, legal, investment, or lending advice. "
+        f"Record: {protected_llm_summary['record']}; "
+        f"Overall status: {protected_llm_summary['risk_profile']['overall']}; "
+        f"Financial resilience bucket: {protected_llm_summary['risk_profile']['financial_resilience_bucket']}; "
+        f"Risk bucket: {protected_llm_summary['risk_profile']['risk_bucket']}; "
+        f"Metric summary: {protected_llm_summary['metrics']}; "
+        f"Section summary: {section_summary}; "
+        f"Model summary: {protected_llm_summary['model_results'][:3]}. "
+        "Generate a concise, cautious finance risk conclusion using only the bucketed summary."
+    )
 
 
 def _build_bucketed_section_prompt_summary(raw_report: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -2160,6 +3034,24 @@ def _build_synthetic_database_privacy(
 
 
 def _build_privacy_prompt_payload(session: Dict[str, Any]) -> Dict[str, Any]:
+    if session.get("scenario") == "finance":
+        raw_results = session["raw_results"]
+        record = session["finance_record"]
+        selected_modalities = session.get("selected_modalities") or []
+        raw_report = build_finance_report(raw_results, record, selected_modalities)
+        rng = random.Random(session["seed"])
+        privacy_bundle = _build_finance_privacy(raw_results, raw_report, record, rng)
+        prompt = _build_finance_llm_prompt(
+            privacy_bundle["protected_llm_summary"],
+            raw_report,
+        )
+        return {
+            "raw_results": raw_results,
+            "raw_report": raw_report,
+            "privacy_bundle": privacy_bundle,
+            "prompt": prompt,
+        }
+
     series = session["series"]
     raw_results = session["raw_results"]
     uwb_for_report = series["uwb"] if series["uwb"] is not None else np.zeros((100, 3))
@@ -2236,14 +3128,55 @@ async def _build_privacy_and_report(session: Dict[str, Any], llm_provider: Optio
     }
 
 @app.get("/api/dispatch")
-async def run_dispatch(selected_modalities: Optional[str] = None):
+async def run_dispatch(selected_modalities: Optional[str] = None, scenario: Optional[str] = None):
     start_time = time.time()
     session_seed = time.time_ns()
+    try:
+        scenario_key = normalize_scenario(scenario)
+    except ValueError as exc:
+        return unsupported_scenario_payload(exc)
+
+    if scenario_key == "finance":
+        try:
+            records = load_finance_records()
+            validate_finance_records(records)
+            selected_ids = resolve_finance_modalities(selected_modalities)
+            finance_record = pick_finance_record(records, session_seed)
+            step1_data = _build_finance_step1(finance_record, selected_ids)
+            step2_bundle = _build_finance_step2(finance_record, selected_ids)
+        except (FileNotFoundError, ValueError) as exc:
+            return {"error": str(exc)}
+
+        session_id = uuid.uuid4().hex
+        _STAGED_SESSIONS[session_id] = {
+            "scenario": "finance",
+            "seed": session_seed,
+            "selected_modalities": selected_ids,
+            "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "step1": step1_data,
+            "step2": step2_bundle["step2"],
+            "finance_record": finance_record,
+            "series": {"uwb": None, "imu": None, "csi": None},
+            "raw_results": step2_bundle["raw_results"],
+        }
+        return {
+            "schema": "he-multimodal-dispatch/v1",
+            "scenario": "finance",
+            "session_id": session_id,
+            "generated_at": _STAGED_SESSIONS[session_id]["generated_at"],
+            "step1": step1_data,
+            "step2": step2_bundle["step2"],
+            "raw_results": step2_bundle["raw_results"],
+            "data_source": "synthetic_personal_finance_dataset.csv",
+            "llm_provider": "ZhipuAI",
+        }
+
     flags = _selected_flags(selected_modalities)
     step1_bundle = _build_step1(flags)
     step2_bundle = _build_step2(flags, step1_bundle["series"])
     session_id = uuid.uuid4().hex
     _STAGED_SESSIONS[session_id] = {
+        "scenario": "healthcare",
         "seed": session_seed,
         "selected_modalities": selected_modalities,
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -2254,6 +3187,7 @@ async def run_dispatch(selected_modalities: Optional[str] = None):
     }
     return {
         "schema": "he-multimodal-dispatch/v1",
+        "scenario": "healthcare",
         "session_id": session_id,
         "generated_at": _STAGED_SESSIONS[session_id]["generated_at"],
         "step1": step1_bundle["step1"],
@@ -2278,6 +3212,7 @@ async def run_privacy_shuffle(session_id: str, llm_provider: Optional[str] = Non
     plaintext_prompt = session.get("plaintext_prompt") or session.get("step3", {}).get("plaintext_prompt") or session.get("step3", {}).get("llm_prompt")
     return {
         "schema": "he-multimodal-privacy/v1",
+        "scenario": session.get("scenario", "healthcare"),
         "session_id": session_id,
         "privacy_protection": session["privacy_protection"],
         "plaintext_prompt": plaintext_prompt,
@@ -2302,7 +3237,12 @@ async def run_report(session_id: str, llm_provider: Optional[str] = None):
         "generated_at": session["generated_at"],
         "step3": session["step3"],
         "privacy_protection": session["privacy_protection"],
-        "data_source": "UT_HAR dataset",
+        "scenario": session.get("scenario", "healthcare"),
+        "data_source": (
+            "synthetic_personal_finance_dataset.csv"
+            if session.get("scenario") == "finance"
+            else "UT_HAR dataset"
+        ),
         "llm_provider": session.get("llm_provider", llm_provider_label(provider_key)),
     }
 

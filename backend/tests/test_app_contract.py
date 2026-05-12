@@ -1,3 +1,4 @@
+import csv
 import importlib.util
 import sys
 import unittest
@@ -145,6 +146,244 @@ class AppContractTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(str(report["summary"]["health_index"]), llm_prompt)
         self.assertNotIn("75.5", llm_prompt)
         self.assertNotIn(f"{report['fall_risk']['probability']:.1%}", llm_prompt)
+
+    async def test_modalities_defaults_to_healthcare(self):
+        response = await self.client.get("/api/modalities")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload.get("scenario"), "healthcare")
+        modality_ids = [item["id"] for item in payload["modalities"]]
+        self.assertIn("depth", modality_ids)
+        self.assertIn("uwb", modality_ids)
+        self.assertIn("blood", modality_ids)
+
+    async def test_modalities_returns_finance_cards_for_finance_scenario(self):
+        response = await self.client.get("/api/modalities", params={"scenario": "finance"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload.get("scenario"), "finance")
+        self.assertEqual(
+            [item["id"] for item in payload["modalities"]],
+            ["income", "expenses", "savings", "loan", "credit", "profile"],
+        )
+        self.assertEqual(payload["modalities"][0]["name"], "Income")
+        self.assertEqual(payload["modalities"][4]["name"], "Credit")
+
+    async def test_modalities_rejects_unknown_explicit_scenario(self):
+        response = await self.client.get("/api/modalities", params={"scenario": "unknown"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("error", payload)
+        self.assertIn("Unsupported scenario", payload["error"])
+
+    async def test_finance_dispatch_returns_finance_session_and_models(self):
+        response = await self.client.get(
+            "/api/dispatch",
+            params={"scenario": "finance", "selected_modalities": "income,credit,loan"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload.get("scenario"), "finance")
+        self.assertEqual(payload.get("data_source"), "synthetic_personal_finance_dataset.csv")
+        self.assertIn("session_id", payload)
+        self.assertEqual(payload["step1"]["enabled_modalities"], ["Income", "Credit", "Loan"])
+        self.assertEqual(
+            [item["id"] for item in payload["step2"]["cluster_models"]],
+            [
+                "income_capacity",
+                "expense_burden",
+                "savings_resilience",
+                "loan_stress",
+                "credit_risk",
+                "profile_context",
+            ],
+        )
+        self.assertEqual(
+            [item["model_id"] for item in payload["step2"]["assignments"]],
+            ["income_capacity", "loan_stress", "credit_risk"],
+        )
+        self.assertEqual(
+            [item["model_id"] for item in payload["raw_results"]],
+            ["income_capacity", "loan_stress", "credit_risk"],
+        )
+
+    async def test_finance_dispatch_rejects_missing_finance_dataset_fields(self):
+        with patch.object(self.backend, "load_finance_records", return_value=[{"user_id": "U1"}]):
+            response = await self.client.get(
+                "/api/dispatch",
+                params={"scenario": "finance", "selected_modalities": "income"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("error", payload)
+        self.assertIn("Missing finance dataset fields", payload["error"])
+
+    async def test_finance_expense_burden_caps_score_at_100(self):
+        result = self.backend.finance_score_for_model(
+            "expense_burden",
+            {"monthly_income_usd": "1000", "monthly_expenses_usd": "2500"},
+        )
+
+        self.assertLessEqual(result["score"], 100)
+        self.assertEqual(result["status"], "attention")
+
+    async def test_finance_expense_burden_treats_zero_income_positive_expenses_as_high_risk(self):
+        result = self.backend.finance_score_for_model(
+            "expense_burden",
+            {"monthly_income_usd": "0", "monthly_expenses_usd": "500"},
+        )
+
+        self.assertGreaterEqual(result["score"], 70)
+        self.assertNotEqual(result["status"], "stable")
+
+    async def test_finance_loan_stress_treats_zero_income_positive_emi_as_high_risk(self):
+        result = self.backend.finance_score_for_model(
+            "loan_stress",
+            {
+                "monthly_income_usd": "0",
+                "monthly_emi_usd": "100",
+                "debt_to_income_ratio": "0",
+                "loan_interest_rate_pct": "0",
+            },
+        )
+
+        self.assertGreaterEqual(result["score"], 70)
+        self.assertNotEqual(result["status"], "stable")
+
+    async def test_finance_report_uses_finance_domain_prompt_and_report(self):
+        finance_record = {
+            "user_id": "U-privacy",
+            "age": "47",
+            "gender": "female",
+            "education_level": "masters",
+            "employment_status": "employed",
+            "job_title": "Analyst",
+            "monthly_income_usd": "12345",
+            "monthly_expenses_usd": "6789",
+            "savings_usd": "43210",
+            "has_loan": "yes",
+            "loan_type": "personal",
+            "loan_amount_usd": "98765",
+            "loan_term_months": "37",
+            "monthly_emi_usd": "1234",
+            "loan_interest_rate_pct": "8.75",
+            "debt_to_income_ratio": "1.37",
+            "credit_score": "543",
+            "savings_to_income_ratio": "3.5",
+            "region": "west",
+            "record_date": "2026-05-01",
+        }
+        with patch.object(self.backend, "load_finance_records", return_value=[finance_record]):
+            dispatch = await self.client.get(
+                "/api/dispatch",
+                params={"scenario": "finance", "selected_modalities": "income,expenses,savings,loan,credit"},
+            )
+        self.assertEqual(dispatch.status_code, 200)
+        session_id = dispatch.json()["session_id"]
+
+        response = await self.client.get(
+            "/api/report",
+            params={"session_id": session_id, "llm_provider": "zhipu"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload.get("scenario"), "finance")
+        self.assertEqual(payload.get("data_source"), "synthetic_personal_finance_dataset.csv")
+        report = payload["step3"]["report"]
+        prompt = payload["step3"]["plaintext_prompt"]
+        self.assertEqual(report.get("domain"), "finance")
+        self.assertEqual(report.get("score_label"), "Financial resilience")
+        self.assertIn("Financial Risk Summary", report["summary"]["title"])
+        self.assertIn("personal finance risk analysis", prompt)
+        self.assertNotIn("health", prompt.lower())
+        self.assertNotIn("clinical", prompt.lower())
+        self.assertNotIn("fall probability", prompt.lower())
+
+        privacy = payload["privacy_protection"]
+        distribution = privacy["distribution_summary"]
+        self.assertEqual(
+            distribution["axes"],
+            {
+                "x": "loan_stress_percentile",
+                "y": "savings_resilience_percentile",
+                "x_source": "loan_stress",
+                "y_source": "savings_resilience",
+            },
+        )
+        bucket_names = {item["bucket"] for item in distribution["risk_buckets"]}
+        self.assertEqual(bucket_names, {"stable", "watch", "attention"})
+        self.assertIn(distribution["target_point"]["bucket"], bucket_names)
+        for point in distribution["scatter_points"]:
+            self.assertGreaterEqual(point["x"], 0.0)
+            self.assertLessEqual(point["x"], 1.0)
+            self.assertGreaterEqual(point["y"], 0.0)
+            self.assertLessEqual(point["y"], 1.0)
+        self.assertNotIn("fall_probability", str(distribution))
+        self.assertNotIn("sleep_efficiency", str(distribution))
+
+        exact_raw_values = [
+            "12345",
+            "6789",
+            "43210",
+            "98765",
+            "1234",
+            "543",
+        ]
+        exact_raw_values.extend(str(item["score"]) for item in payload["step3"]["results"])
+        for value in exact_raw_values:
+            self.assertNotIn(value, prompt)
+
+
+class FinanceDatasetTests(unittest.TestCase):
+    DATA_PATH = BACKEND_DIR.parent / "test_data" / "synthetic_personal_finance_dataset.csv"
+
+    def test_finance_dataset_exists_with_expected_shape(self):
+        self.assertTrue(self.DATA_PATH.exists(), f"Missing finance dataset: {self.DATA_PATH}")
+
+        with self.DATA_PATH.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.reader(handle)
+            header = next(reader)
+            row_count = sum(1 for _ in reader)
+
+        self.assertEqual(len(header), 20)
+        self.assertEqual(row_count, 32424)
+
+    def test_finance_dataset_contains_required_columns(self):
+        required = {
+            "user_id",
+            "age",
+            "gender",
+            "education_level",
+            "employment_status",
+            "job_title",
+            "monthly_income_usd",
+            "monthly_expenses_usd",
+            "savings_usd",
+            "has_loan",
+            "loan_type",
+            "loan_amount_usd",
+            "loan_term_months",
+            "monthly_emi_usd",
+            "loan_interest_rate_pct",
+            "debt_to_income_ratio",
+            "credit_score",
+            "savings_to_income_ratio",
+            "region",
+            "record_date",
+        }
+
+        self.assertTrue(self.DATA_PATH.exists(), f"Missing finance dataset: {self.DATA_PATH}")
+        with self.DATA_PATH.open("r", encoding="utf-8", newline="") as handle:
+            header = set(next(csv.reader(handle)))
+
+        missing_columns = required - header
+        self.assertEqual(missing_columns, set(), f"Missing finance dataset columns: {missing_columns}")
 
 
 if __name__ == "__main__":

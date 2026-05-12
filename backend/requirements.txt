@@ -7,3 +7,4 @@ openai
 matplotlib
 fastmcp
 torch
+httpx

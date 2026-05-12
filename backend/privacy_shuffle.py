@@ -529,6 +529,17 @@ def _bucket_number(value: Any, width: int = 5) -> str:
     return f"{low}-{low + width}"
 
 
+def _finance_score_bucket(value: Any, width: int = 5) -> str:
+    if not isinstance(value, (int, float)):
+        return "masked bucket"
+    score = max(0.0, min(100.0, float(value)))
+    if score >= 100.0:
+        low = 100 - width
+    else:
+        low = int(score // width) * width
+    return f"{low}-{low + width}"
+
+
 def _metric_bucket(name: str, value: Any, status: str = "normal") -> str:
     if not isinstance(value, (int, float)):
         status_label = str(status or "").lower()
@@ -561,6 +572,31 @@ def _metric_bucket(name: str, value: Any, status: str = "normal") -> str:
 
 def build_protected_llm_summary(record: Dict[str, Any]) -> Dict[str, Any]:
     metrics = record.get("derived_metrics", {})
+    if record.get("domain") == "finance":
+        return {
+            "domain": "finance",
+            "record": record.get("_anonymous_label") or record.get("label", "Synthetic Record"),
+            "risk_profile": {
+                "overall": record.get("overall", "Watch"),
+                "financial_resilience_bucket": _bucket_percent(metrics.get("financial_resilience")),
+                "risk_bucket": record.get("risk_bucket", "attention"),
+            },
+            "model_results": [
+                {
+                    "model": output.get("model"),
+                    "status": output.get("status"),
+                    "score_bucket": _finance_score_bucket(output.get("score")),
+                }
+                for output in record.get("model_outputs", [])
+            ],
+            "metrics": {
+                "cashflow_burden": _bucket_percent(metrics.get("cashflow_burden")),
+                "loan_stress": _bucket_percent(metrics.get("loan_stress")),
+                "credit_standing": _bucket_number(metrics.get("credit_standing"), width=50),
+                "debt_to_income": _bucket_number(metrics.get("debt_to_income"), width=1),
+            },
+        }
+
     return {
         "record": record.get("_anonymous_label", "Synthetic Record"),
         "risk_profile": {

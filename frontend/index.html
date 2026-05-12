@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Secure Multimodal HE + LLM Demo</title>
-  <link rel="stylesheet" href="./assets/css/styles.css?v=58"/>
+  <link rel="stylesheet" href="./assets/css/styles.css?v=63"/>
   <link rel="stylesheet" href="./assets/css/enhancement.css?v=15"/>
 </head>
 <body>
@@ -14,8 +14,12 @@
         <h1>MyGPTShield</h1>
         <p>Encoding-decoding multimodal inference dashboard</p>
       </div>
+      <div class="scene-tabs" id="sceneTabs" role="tablist" aria-label="Analysis scene">
+        <button class="scene-tab active" type="button" role="tab" aria-selected="true" data-scenario="healthcare">Healthcare</button>
+        <button class="scene-tab" type="button" role="tab" aria-selected="false" data-scenario="finance">Finance</button>
+      </div>
       <ol class="stepper" aria-label="Workflow steps">
-        <li class="step active" data-step="select"><span>1</span>Select Medical Data</li>
+        <li class="step active" data-step="select"><span>1</span><span class="step-label" id="stepSelectLabel">Select Medical Data</span></li>
         <li class="step" data-step="model"><span>2</span>Local Encoders</li>
         <li class="step" data-step="privacy"><span>3</span>Shuffle</li>
         <li class="step" data-step="llm"><span>4</span>Send to LLM</li>
@@ -28,11 +32,11 @@
       <aside class="panel panel-modalities workflow-panel active-panel" id="stepUpload">
         <div class="panel-head">
           <div>
-            <h2>Select Medical Data</h2>
-            <p>Choose multimodal data sources for encrypted health inference.</p>
+            <h2 id="dataPanelTitle">Select Medical Data</h2>
+            <p id="dataPanelSubtitle">Choose multimodal data sources for encrypted health inference.</p>
           </div>
           <div class="panel-meta">
-            <span class="count-pill"><span id="selectedCount">0</span>/10</span>
+            <span class="count-pill"><span id="selectedCount">0</span>/<span id="selectionLimit">10</span></span>
             <span class="pill" id="tUpload">—</span>
           </div>
         </div>
@@ -58,8 +62,8 @@
         <section class="panel panel-models workflow-panel" id="stepDispatch">
           <div class="panel-head">
             <div>
-              <h2>Multimodal Data Encoders</h2>
-              <p>Selected medical data are dispatched to specialized local encoders.</p>
+              <h2 id="modelPanelTitle">Multimodal Data Encoders</h2>
+              <p id="modelPanelSubtitle">Selected medical data are dispatched to specialized local encoders.</p>
             </div>
             <span class="pill" id="tDispatch">—</span>
           </div>
@@ -110,8 +114,8 @@
       <section class="panel panel-report workflow-panel" id="stepDecrypt">
           <div class="panel-head">
             <div>
-              <h2>Protected Health Report</h2>
-              <p>Privacy-preserved clinical summary with status and recommendations.</p>
+              <h2 id="reportPanelTitle">Protected Health Report</h2>
+              <p id="reportPanelSubtitle">Privacy-preserved clinical summary with status and recommendations.</p>
             </div>
             <span class="pill" id="tDecrypt">—</span>
           </div>
@@ -155,8 +159,8 @@
     </section>
   </main>
 
-  <script src="./assets/js/modalityCards.js?v=21"></script>
-  <script src="./assets/js/modality-selector.js?v=44"></script>
-  <script src="./assets/js/app.js?v=54"></script>
+  <script src="./assets/js/modalityCards.js?v=26"></script>
+  <script src="./assets/js/modality-selector.js?v=46"></script>
+  <script src="./assets/js/app.js?v=55"></script>
 </body>
 </html>

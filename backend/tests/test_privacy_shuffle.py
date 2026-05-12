@@ -148,6 +148,40 @@ class PrivacyShuffleTests(unittest.TestCase):
         self.assertNotIn("75.5", str(summary))
         self.assertNotIn("142.0", str(summary))
 
+    def test_build_protected_llm_summary_supports_finance_buckets(self):
+        real_record = {
+            "kind": "real",
+            "domain": "finance",
+            "label": "Real Finance Record",
+            "risk_bucket": "attention",
+            "overall": "Watch",
+            "_anonymous_label": "Synthetic Record 11",
+            "model_outputs": [
+                {"model": "Credit Risk", "model_id": "credit_risk", "score": 62.4, "status": "watch"},
+                {"model": "Loan Stress", "model_id": "loan_stress", "score": 72.1, "status": "attention"},
+                {"model": "Profile Context", "model_id": "profile_context", "score": 100.0, "status": "stable"},
+            ],
+            "derived_metrics": {
+                "financial_resilience": 0.44,
+                "cashflow_burden": 0.67,
+                "loan_stress": 0.72,
+                "credit_standing": 543,
+                "debt_to_income": 1.4,
+            },
+        }
+
+        summary = build_protected_llm_summary(real_record)
+
+        self.assertEqual(summary["domain"], "finance")
+        self.assertEqual(summary["record"], "Synthetic Record 11")
+        self.assertEqual(summary["risk_profile"]["financial_resilience_bucket"], "40-45%")
+        self.assertEqual(summary["metrics"]["loan_stress"], "70-75%")
+        self.assertEqual(summary["metrics"]["credit_standing"], "500-550")
+        self.assertEqual(summary["model_results"][2]["score_bucket"], "95-100")
+        self.assertNotEqual(summary["model_results"][2]["score_bucket"], "100-105")
+        self.assertNotIn("543", str(summary))
+        self.assertNotIn("72.1", str(summary))
+
     def test_generate_candidate_pool_returns_requested_size(self):
         rng = random.Random(42)
         profile = derive_privacy_profile(self.raw_results, self.raw_report)
