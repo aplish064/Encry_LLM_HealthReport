@@ -5,6 +5,7 @@ const API_BASE = (
     ? `${window.location.protocol}//${window.location.hostname}:8082`
     : "")
 );
+window.API_BASE = API_BASE;
 
 const $ = (id) => document.getElementById(id);
 

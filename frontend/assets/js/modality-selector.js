@@ -27,15 +27,17 @@ class ModalitySelector {
     try {
       this.setLoadingState(true);
       this.applyScenarioLabels();
-      await this.loadModalities();
-      await this.loadModalityThumbnails(); // 加载缩略图
+      this.modalities = this.getDefaultModalities();
+      this.maxSelection = this.currentScenario === 'finance' ? 6 : 10;
       this.renderCards();
       this.attachEventListeners();
 
       // Initialize Step 2 local encoders (show all 10 encoders, dimmed by default)
       console.log('🔵 Initializing local encoders');
       this.updateModelCluster();
+      this.updateUI();
       console.log('✅ ModalitySelector initialization complete');
+      this.refreshModalityData();
     } catch (error) {
       console.error('❌ ModalitySelector initialization failed:', error);
       this.showError('Initialization failed. Please refresh and try again.');
@@ -47,11 +49,11 @@ class ModalitySelector {
   async loadModalities() {
     try {
       // 使用全局API_BASE（在app.js中定义）
-      const apiBase = (typeof API_BASE !== 'undefined')
+      const apiBase = (typeof API_BASE !== 'undefined' && API_BASE)
         ? API_BASE
-        : (window.location.port === "8001"
+        : (window.API_BASE || (window.location.port === "8001"
           ? `${window.location.protocol}//${window.location.hostname}:8082`
-          : "");
+          : ""));
       const response = await this.fetchWithTimeout(`${apiBase}/api/modalities?scenario=${encodeURIComponent(this.currentScenario)}`, {
         method: 'GET',
         headers: {
@@ -68,29 +70,33 @@ class ModalitySelector {
       this.maxSelection = this.currentScenario === 'finance' ? Math.min(6, this.modalities.length || 6) : 10;
     } catch (error) {
       console.error('Failed to load modality configuration:', error);
-
-      if (error.name === 'AbortError') {
-        throw new Error('Request timed out. Please check your network connection.');
-      }
-
-      if (!navigator.onLine) {
-        throw new Error('Network is offline. Please check connection.');
-      }
-
-      // 使用默认配置
       this.modalities = this.getDefaultModalities();
       this.maxSelection = this.currentScenario === 'finance' ? 6 : 10;
       console.warn('Using fallback modality configuration');
     }
   }
 
+  async refreshModalityData() {
+    try {
+      await this.loadModalities();
+      this.renderCards();
+      this.updateUI();
+      this.updateModelCluster();
+      await this.loadModalityThumbnails();
+      this.renderCards();
+      this.updateUI();
+    } catch (error) {
+      console.warn('Background modality refresh failed:', error);
+    }
+  }
+
   async loadModalityThumbnails() {
     // 加载每个模态的缩略图预览
-    const apiBase = (typeof API_BASE !== 'undefined')
+    const apiBase = (typeof API_BASE !== 'undefined' && API_BASE)
       ? API_BASE
-      : (window.location.port === "8001"
+      : (window.API_BASE || (window.location.port === "8001"
         ? `${window.location.protocol}//${window.location.hostname}:8082`
-        : "");
+        : ""));
 
     console.log('Loading modality thumbnails...');
 
@@ -660,11 +666,11 @@ class ModalitySelector {
 
     try {
       const dataUrl = await this.readFileAsDataUrl(file);
-      const apiBase = (typeof API_BASE !== 'undefined')
+      const apiBase = (typeof API_BASE !== 'undefined' && API_BASE)
         ? API_BASE
-        : (window.location.port === "8001"
+        : (window.API_BASE || (window.location.port === "8001"
           ? `${window.location.protocol}//${window.location.hostname}:8082`
-          : "");
+          : ""));
       const response = await this.fetchWithTimeout(`${apiBase}/api/upload_medical_image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -884,11 +890,11 @@ class ModalitySelector {
   async launchAnalysisWithRetry(selectedList, attempt = 1) {
     try {
       this.updateProgress(20, `Dispatching encrypted inference... (${attempt}/${this.maxRetries})`);
-      const apiBase = (typeof API_BASE !== 'undefined')
+      const apiBase = (typeof API_BASE !== 'undefined' && API_BASE)
         ? API_BASE
-        : (window.location.port === "8001"
+        : (window.API_BASE || (window.location.port === "8001"
           ? `${window.location.protocol}//${window.location.hostname}:8082`
-          : "");
+          : ""));
 
       if (typeof setWorkflowStep === 'function') {
         setWorkflowStep('model');
