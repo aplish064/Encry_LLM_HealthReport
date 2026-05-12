@@ -22,7 +22,7 @@ def load_backend_module():
     return module
 
 
-async def fake_llm_response(prompt: str, max_tokens: int = 1024) -> str:
+async def fake_llm_response(prompt: str, provider: str = None, max_tokens: int = 1024) -> str:
     return "test conclusion"
 
 
@@ -31,12 +31,26 @@ class AppContractTests(unittest.IsolatedAsyncioTestCase):
         self.backend = load_backend_module()
         transport = httpx.ASGITransport(app=self.backend.app)
         self.client = httpx.AsyncClient(transport=transport, base_url="http://testserver")
-        self.llm_patch = patch.object(self.backend, "call_zhipu_llm", side_effect=fake_llm_response)
+        self.llm_patch = patch.object(self.backend, "call_selected_llm", side_effect=fake_llm_response)
         self.llm_mock = self.llm_patch.start()
 
     async def asyncTearDown(self):
         self.llm_patch.stop()
         await self.client.aclose()
+
+    async def test_all_llm_provider_choices_route_to_xiaomi_mimo(self):
+        providers = ["qwen", "deepseek", "zhipu", "kimi", "minimax", "doubao", "xiaomi-mimo", "unknown"]
+
+        for provider in providers:
+            with self.subTest(provider=provider):
+                self.assertEqual(self.backend.normalize_llm_provider(provider), "xiaomi-mimo")
+
+    async def test_xiaomi_mimo_default_endpoint_is_configured(self):
+        config = self.backend.LLM_PROVIDER_OPTIONS["xiaomi-mimo"]
+
+        self.assertEqual(config["default_base_url"], "https://api.xiaomimimo.com/v1/chat/completions")
+        self.assertTrue(config["default_api_key"].startswith("sk-"))
+        self.assertEqual(config["default_model"], "mimo-v2-flash")
 
     async def test_cycle_accepts_modality_ids_without_falling_back_to_all_modalities(self):
         response = await self.client.get("/api/cycle", params={"selected_modalities": "depth,uwb,imu,csi,rgb"})

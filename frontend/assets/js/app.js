@@ -41,7 +41,7 @@ function renderLlmPromptRoute() {
         <span class="llmRouteArrowHead"></span>
       </div>
       <div class="llm-icon-group llmPromptIconGroup" id="llmIconGroup" role="group" aria-label="Target LLM">
-        <button class="llm-icon-option active" type="button" data-llm-provider="qwen" data-llm-label="Qwen" aria-pressed="true" title="Qwen">
+        <button class="llm-icon-option" type="button" data-llm-provider="qwen" data-llm-label="Qwen" aria-pressed="false" title="Qwen">
           <img src="./assets/icons/qwen-color.svg" alt="Qwen"/>
         </button>
         <button class="llm-icon-option" type="button" data-llm-provider="deepseek" data-llm-label="DeepSeek Compatible" aria-pressed="false" title="DeepSeek Compatible">
@@ -59,12 +59,12 @@ function renderLlmPromptRoute() {
         <button class="llm-icon-option" type="button" data-llm-provider="doubao" data-llm-label="Doubao" aria-pressed="false" title="Doubao">
           <img src="./assets/icons/doubao-color.svg" alt="Doubao"/>
         </button>
-        <button class="llm-icon-option" type="button" data-llm-provider="xiaomi-mimo" data-llm-label="Xiaomi MiMo" aria-pressed="false" title="Xiaomi MiMo">
+        <button class="llm-icon-option active" type="button" data-llm-provider="xiaomi-mimo" data-llm-label="Xiaomi MiMo" aria-pressed="true" title="Xiaomi MiMo">
           <img src="./assets/icons/xiaomimimo.svg" alt="Xiaomi MiMo"/>
         </button>
       </div>
-      <div class="route-meta" id="llmRouteMeta">Ready to send to Qwen after shuffle.</div>
-      <button class="confirm-llm-btn" type="button" id="confirmLlmBtn" disabled>Confirm Qwen and generate report</button>
+      <div class="route-meta" id="llmRouteMeta">Ready to send to Xiaomi MiMo after shuffle.</div>
+      <button class="confirm-llm-btn" type="button" id="confirmLlmBtn" disabled>Confirm Xiaomi MiMo and generate report</button>
     </div>
   `;
 }

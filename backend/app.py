@@ -308,7 +308,7 @@ LLM_PROVIDER_OPTIONS = {
         "api_key_env": "XIAOMI_MIMO_API_KEY",
         "base_url_env": "XIAOMI_MIMO_BASE_URL",
         "model_env": "XIAOMI_MIMO_MODEL",
-        "default_api_key": "sk-cckz9k7x2x3419381mm1hqqxld616ziso3yk85dcdsbyes1p",
+        "default_api_key": "sk-cq1ml0wvzu4mrfttjtm5ylbpl8p4dfjsx620z45k78500wg2",
         "default_base_url": "https://api.xiaomimimo.com/v1/chat/completions",
         "default_model": "mimo-v2-flash",
     },
@@ -502,8 +502,7 @@ def png_b64_from_file(path: str) -> Optional[str]:
 
 
 def normalize_llm_provider(provider: Optional[str]) -> str:
-    provider_key = str(provider or "zhipu").strip().lower()
-    return provider_key if provider_key in LLM_PROVIDER_OPTIONS else "qwen"
+    return "xiaomi-mimo"
 
 
 def llm_provider_label(provider: Optional[str]) -> str:

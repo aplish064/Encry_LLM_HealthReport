@@ -16,8 +16,8 @@ class ModalitySelector {
     this.modalityThumbnails = {}; // 存储模态缩略图
     this.uploadedMedicalImage = null;
     this.uploadedModalityImages = {};
-    this.selectedLlmProvider = 'qwen';
-    this.selectedLlmLabel = 'Qwen';
+    this.selectedLlmProvider = 'xiaomi-mimo';
+    this.selectedLlmLabel = 'Xiaomi MiMo';
     this.llmConfirmationResolver = null;
     this.init();
   }
