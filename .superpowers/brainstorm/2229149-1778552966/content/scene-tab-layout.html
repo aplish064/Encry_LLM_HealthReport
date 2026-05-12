@@ -1,0 +1,72 @@
+<h2>Where should the scene switch live?</h2>
+<p class="subtitle">Goal: keep the current encrypted workflow intact, and let Healthcare / Finance swap the data panel, local encoders, protected prompt, and final report language.</p>
+
+<div class="cards">
+  <div class="card" data-choice="header-tabs" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Header-level scene tabs</div>
+        <div class="mockup-body">
+          <div class="mock-nav">MyGPTShield&nbsp;&nbsp; <button class="mock-button">Healthcare</button> <button class="mock-button">Finance</button> &nbsp;&nbsp; Run Analysis</div>
+          <div style="display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:10px;margin-top:12px;">
+            <div class="placeholder">Selected scene data cards</div>
+            <div class="placeholder">Scene-specific local encoders</div>
+            <div class="placeholder">Protected scene report</div>
+          </div>
+          <div class="placeholder" style="margin-top:10px;">Shared shuffle / LLM route</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Global tab in header</h3>
+      <p>The whole dashboard clearly belongs to one active scene. Recommended for a demo because users immediately understand Healthcare vs Finance as a top-level mode.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="data-panel-tabs" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Tabs inside data panel</div>
+        <div class="mockup-body">
+          <div class="mock-nav">MyGPTShield &nbsp;&nbsp; Run Analysis</div>
+          <div style="display:grid;grid-template-columns:1.05fr 1fr 1fr;gap:10px;margin-top:12px;">
+            <div class="placeholder"><button class="mock-button">Healthcare</button> <button class="mock-button">Finance</button><br/>Data cards change here</div>
+            <div class="placeholder">Encoders change after data choice</div>
+            <div class="placeholder">Report changes after run</div>
+          </div>
+          <div class="placeholder" style="margin-top:10px;">Shared shuffle / LLM route</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Tab only in data panel</h3>
+      <p>Minimal visual disruption, but the scene can feel like a data filter rather than a full workflow mode. Good if Finance is an add-on, weaker if it should be equal.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="left-rail" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup">
+        <div class="mockup-header">Scene rail + workflow</div>
+        <div class="mockup-body">
+          <div style="display:grid;grid-template-columns:110px 1fr;gap:10px;">
+            <div class="mock-sidebar">Healthcare<br/><br/>Finance</div>
+            <div>
+              <div class="mock-nav">Workflow steps + Run Analysis</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px;">
+                <div class="placeholder">Data</div>
+                <div class="placeholder">Encoders</div>
+                <div class="placeholder">Report</div>
+              </div>
+              <div class="placeholder" style="margin-top:10px;">Shared privacy flow</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Left scene rail</h3>
+      <p>Scales if many domains are coming later, but it is more layout work and competes with the existing workflow density.</p>
+    </div>
+  </div>
+</div>
