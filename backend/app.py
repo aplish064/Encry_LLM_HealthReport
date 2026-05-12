@@ -213,6 +213,12 @@ MODALITY_ID_TO_CANONICAL = {
     "chest": "Chest",
     "path": "Path",
     "blood": "Blood",
+    "income": "Income",
+    "expenses": "Expenses",
+    "savings": "Savings",
+    "loan": "Loan",
+    "credit": "Credit",
+    "profile": "Profile",
 }
 
 MODALITY_CANONICAL_TO_LABEL = {
@@ -226,7 +232,15 @@ MODALITY_CANONICAL_TO_LABEL = {
     "Chest": "Chest",
     "Path": "Pathology",
     "Blood": "Blood",
+    "Income": "Income",
+    "Expenses": "Expenses",
+    "Savings": "Savings",
+    "Loan": "Loan",
+    "Credit": "Credit",
+    "Profile": "Profile",
 }
+
+FINANCE_CANONICAL_MODALITIES = {"Income", "Expenses", "Savings", "Loan", "Credit", "Profile"}
 
 def normalize_modality_name(name: str) -> str:
     """将模态完整名称转换为后端get_data函数期望的简化名称"""
@@ -676,6 +690,11 @@ def get_data(name: str) -> np.ndarray:
         except Exception as e:
             print(f"Warning: Failed to load data from {p}: {e}")
 
+    if name in ["UWB", "IMU", "CSI"]:
+        arr = _generate_timeseries_sample(name)
+        _DATA_CACHE[name] = arr
+        return arr
+
     # 对于医学图像数据集，生成模拟数据
     if name in ["Retina", "Chest", "Path", "Blood", "NTU"]:
         arr = _generate_medical_image_sample(name)
@@ -698,6 +717,34 @@ def get_data(name: str) -> np.ndarray:
         return arr
 
     raise FileNotFoundError(f"Missing data file for {name}: {p}")
+
+def _generate_timeseries_sample(modality: str) -> np.ndarray:
+    """Generate deterministic fallback sensor samples when local test files are absent."""
+    rng = np.random.default_rng({"UWB": 101, "IMU": 202, "CSI": 303}.get(modality, 0))
+    n = 256
+    t = np.linspace(0, 12, n)
+
+    if modality == "UWB":
+        return np.column_stack([
+            0.45 + 0.05 * np.sin(2 * np.pi * 0.22 * t) + rng.normal(0, 0.006, n),
+            0.30 + 0.04 * np.cos(2 * np.pi * 0.18 * t + 0.4) + rng.normal(0, 0.006, n),
+            0.18 + 0.03 * np.sin(2 * np.pi * 0.08 * t + 1.1) + rng.normal(0, 0.004, n),
+        ])
+
+    if modality == "IMU":
+        channels = []
+        for idx in range(6):
+            freq = 0.7 + idx * 0.09
+            phase = idx * 0.35
+            channels.append(0.12 * np.sin(2 * np.pi * freq * t + phase) + rng.normal(0, 0.018, n))
+        return np.column_stack(channels)
+
+    csi_channels = []
+    for idx in range(8):
+        freq = 1.0 + idx * 0.07
+        phase = idx * 0.28
+        csi_channels.append(0.65 + 0.09 * np.sin(2 * np.pi * freq * t + phase) + rng.normal(0, 0.015, n))
+    return np.column_stack([np.arange(n), *csi_channels])
 
 def _generate_medical_image_sample(modality: str) -> np.ndarray:
     """为医学图像模态生成模拟样本数据"""
@@ -1906,8 +1953,14 @@ async def get_modality_thumbnail(modality: str):
 
         elif data_type == "skeleton":
             # 骨架数据：返回关键点
-            result["data"] = data.tolist() if isinstance(data, np.ndarray) else data
-            result["shape"] = list(data.shape) if isinstance(data, np.ndarray) else [25, 3]
+            skeleton = data
+            if isinstance(skeleton, np.ndarray):
+                skeleton = skeleton.reshape(25, 3) if skeleton.size >= 75 else skeleton
+                result["data"] = skeleton.tolist()
+                result["shape"] = list(skeleton.shape)
+            else:
+                result["data"] = skeleton
+                result["shape"] = [25, 3]
             print(f"   Skeleton data: {result['shape']}")
 
         elif data_type in ["image", "medical_image"]:
@@ -2006,6 +2059,19 @@ async def upload_medical_image(payload: Dict[str, Any] = Body(...)):
         image.verify()
         image = Image.open(BytesIO(raw)).convert("RGB")
         image.thumbnail((512, 512))
+        if canonical_name in FINANCE_CANONICAL_MODALITIES:
+            img_bytes = BytesIO()
+            image.save(img_bytes, format="PNG")
+            saved = img_bytes.getvalue()
+            return {
+                "ok": True,
+                "filename": filename,
+                "modality": MODALITY_CANONICAL_TO_LABEL.get(canonical_name, canonical_name),
+                "modality_id": modality_id,
+                "shape": [image.height, image.width, 3],
+                "thumbnail": b64e(saved),
+            }
+
         os.makedirs(ASSET_USER_DIR, exist_ok=True)
         if canonical_name == "Depth":
             target_path = DEPTH_PNG_PATH

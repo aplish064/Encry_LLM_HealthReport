@@ -4,12 +4,27 @@ Simple models that can be converted to homomorphic computation
 """
 
 import numpy as np
-import torch
-import torch.nn as nn
 from typing import Dict, Any, Tuple, Optional
 
+try:
+    import torch
+    import torch.nn as nn
+    TORCH_AVAILABLE = True
+except ImportError:
+    torch = None
+    nn = None
+    TORCH_AVAILABLE = False
 
-class SimpleTimeSeriesModel(nn.Module):
+
+class _NumpyModule:
+    def __call__(self, x):
+        return self.forward(x)
+
+
+BaseModel = nn.Module if TORCH_AVAILABLE else _NumpyModule
+
+
+class SimpleTimeSeriesModel(BaseModel):
     """
     Simple linear model for time series data
     Uses 2-layer MLP with minimal parameters for efficient HE computation
@@ -20,19 +35,30 @@ class SimpleTimeSeriesModel(nn.Module):
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
 
-        # Simple 2-layer MLP
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
-        self.relu = nn.ReLU()
+        if TORCH_AVAILABLE:
+            self.fc1 = nn.Linear(input_dim, hidden_dim)
+            self.fc2 = nn.Linear(hidden_dim, output_dim)
+            self.relu = nn.ReLU()
+        else:
+            rng = np.random.default_rng(input_dim * 1000 + hidden_dim * 10 + output_dim)
+            self.w1 = rng.normal(0, 0.12, size=(hidden_dim, input_dim))
+            self.b1 = rng.normal(0, 0.03, size=(hidden_dim,))
+            self.w2 = rng.normal(0, 0.12, size=(output_dim, hidden_dim))
+            self.b2 = rng.normal(0, 0.03, size=(output_dim,))
 
     def forward(self, x):
         """
         Forward pass: x -> fc1 -> relu -> fc2 -> output
         """
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.fc2(x)
-        return x
+        if TORCH_AVAILABLE:
+            x = self.fc1(x)
+            x = self.relu(x)
+            x = self.fc2(x)
+            return x
+
+        arr = np.asarray(x, dtype=float)
+        hidden = np.maximum(arr @ self.w1.T + self.b1, 0)
+        return hidden @ self.w2.T + self.b2
 
     def get_weights_for_he(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -41,10 +67,17 @@ class SimpleTimeSeriesModel(nn.Module):
         Returns:
             (W1, b1, W2, b2): Weight matrices and biases
         """
-        W1 = self.fc1.weight.detach().numpy().flatten()
-        b1 = self.fc1.bias.detach().numpy()
-        W2 = self.fc2.weight.detach().numpy().flatten()
-        b2 = self.fc2.bias.detach().numpy()
+        if TORCH_AVAILABLE:
+            W1 = self.fc1.weight.detach().numpy().flatten()
+            b1 = self.fc1.bias.detach().numpy()
+            W2 = self.fc2.weight.detach().numpy().flatten()
+            b2 = self.fc2.bias.detach().numpy()
+            return W1, b1, W2, b2
+
+        W1 = self.w1.flatten()
+        b1 = self.b1
+        W2 = self.w2.flatten()
+        b2 = self.b2
         return W1, b1, W2, b2
 
     def compute_he_formula(self, features: np.ndarray) -> Tuple[float, float]:
@@ -71,7 +104,7 @@ class SimpleTimeSeriesModel(nn.Module):
         return effective_weight.flatten(), effective_bias
 
 
-class SimpleCNNModel(nn.Module):
+class SimpleCNNModel(BaseModel):
     """
     Simple CNN for image data (Depth/RGB)
     Uses single convolutional layer for minimal HE computation
@@ -82,23 +115,36 @@ class SimpleCNNModel(nn.Module):
         self.hidden_dim = hidden_dim
         self.output_dim = output_dim
 
-        # Single conv layer + global pooling + FC
-        self.conv1 = nn.Conv2d(in_channels, hidden_dim,
-                              kernel_size=3, padding=1)
-        self.pool = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(hidden_dim, output_dim)
-        self.relu = nn.ReLU()
+        if TORCH_AVAILABLE:
+            self.conv1 = nn.Conv2d(in_channels, hidden_dim, kernel_size=3, padding=1)
+            self.pool = nn.AdaptiveAvgPool2d(1)
+            self.fc = nn.Linear(hidden_dim, output_dim)
+            self.relu = nn.ReLU()
+        else:
+            rng = np.random.default_rng(in_channels * 1000 + hidden_dim * 10 + output_dim)
+            self.conv_w = rng.normal(0, 0.08, size=(hidden_dim, in_channels, 3, 3))
+            self.fc_w = rng.normal(0, 0.08, size=(output_dim, hidden_dim))
+            self.fc_b = rng.normal(0, 0.03, size=(output_dim,))
 
     def forward(self, x):
         """
         Forward pass: x -> conv -> relu -> pool -> fc -> output
         """
-        x = self.conv1(x)
-        x = self.relu(x)
-        x = self.pool(x)
-        x = x.view(x.size(0), -1)
-        x = self.fc(x)
-        return x
+        if TORCH_AVAILABLE:
+            x = self.conv1(x)
+            x = self.relu(x)
+            x = self.pool(x)
+            x = x.view(x.size(0), -1)
+            x = self.fc(x)
+            return x
+
+        arr = np.asarray(x, dtype=float)
+        if arr.ndim == 3:
+            arr = arr[None, ...]
+        pooled = arr.mean(axis=(-2, -1))
+        channel_weights = self.conv_w.mean(axis=(-2, -1)).T
+        hidden = np.maximum(pooled @ channel_weights, 0)
+        return hidden @ self.fc_w.T + self.fc_b
 
     def get_weights_for_he(self) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -107,13 +153,15 @@ class SimpleCNNModel(nn.Module):
         Returns:
             (weight, bias): Flattened convolutional weights and FC bias
         """
-        # Get conv weights: (out_channels, in_channels, 3, 3)
-        conv_w = self.conv1.weight.detach().numpy()
+        if TORCH_AVAILABLE:
+            conv_w = self.conv1.weight.detach().numpy()
+            fc_b = self.fc.bias.detach().numpy()
+        else:
+            conv_w = self.conv_w
+            fc_b = self.fc_b
+
         # Flatten to (out_channels, in_channels * 9)
         conv_w_flat = conv_w.reshape(self.hidden_dim, -1)
-
-        # Get FC bias
-        fc_b = self.fc.bias.detach().numpy()
 
         return conv_w_flat, fc_b
 
@@ -138,7 +186,7 @@ class SimpleCNNModel(nn.Module):
 
 
 def create_model_for_modality(modality: str,
-                             model_type: str = "time_series") -> nn.Module:
+                             model_type: str = "time_series") -> Any:
     """
     Factory function to create models for different sensor modalities
 
@@ -213,11 +261,11 @@ if __name__ == "__main__":
     ts_model = SimpleTimeSeriesModel(input_dim=8, hidden_dim=16, output_dim=1)
 
     # Test forward pass
-    x = torch.randn(1, 8)
+    x = torch.randn(1, 8) if TORCH_AVAILABLE else np.random.randn(1, 8)
     output = ts_model(x)
     print(f"  Input shape: {x.shape}")
     print(f"  Output shape: {output.shape}")
-    print(f"  Output value: {output.item():.4f}")
+    print(f"  Output value: {float(np.asarray(output).reshape(-1)[0]):.4f}")
 
     # Test HE weight extraction
     W1, b1, W2, b2 = ts_model.get_weights_for_he()
@@ -233,11 +281,11 @@ if __name__ == "__main__":
     cnn_model = SimpleCNNModel(in_channels=1, hidden_dim=32, output_dim=1)
 
     # Test forward pass
-    x = torch.randn(1, 1, 64, 64)
+    x = torch.randn(1, 1, 64, 64) if TORCH_AVAILABLE else np.random.randn(1, 1, 64, 64)
     output = cnn_model(x)
     print(f"  Input shape: {x.shape}")
     print(f"  Output shape: {output.shape}")
-    print(f"  Output value: {output.item():.4f}")
+    print(f"  Output value: {float(np.asarray(output).reshape(-1)[0]):.4f}")
 
     # Test HE weight extraction
     conv_w, fc_b = cnn_model.get_weights_for_he()

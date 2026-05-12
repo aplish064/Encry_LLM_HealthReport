@@ -525,7 +525,13 @@ class ModalitySelector {
     });
 
     const ctPreview = document.getElementById('ctResPreview');
-    if (ctPreview) ctPreview.textContent = '—';
+    if (ctPreview) {
+      if (typeof updateCipherPreviewRows === 'function') {
+        updateCipherPreviewRows('—');
+      } else {
+        ctPreview.textContent = '—';
+      }
+    }
     const privacyPanel = document.getElementById('privacyPanel');
     if (privacyPanel) privacyPanel.textContent = 'Select modalities and run analysis to generate the anonymized privacy flow.';
     const resultsTitle = document.getElementById('resultsTitle');
@@ -911,7 +917,10 @@ class ModalitySelector {
       const privacyData = await this.fetchJson(
         `${apiBase}/api/privacy_shuffle?session_id=${encodeURIComponent(dispatchData.session_id)}`
       );
-      this.renderPrivacyStage(privacyData);
+      this.renderPrivacyStage({
+        ...privacyData,
+        aggregate_cipher_preview: dispatchData.step2?.aggregate_cipher_preview,
+      });
       await this.wait(10500);
 
       if (typeof setWorkflowStep === 'function') {
@@ -1031,7 +1040,11 @@ class ModalitySelector {
       renderCluster(s2.cluster_models || [], s2.assignments || []);
       const ctPreview = document.getElementById('ctResPreview');
       if (ctPreview && s2.aggregate_cipher_preview) {
-        ctPreview.textContent = s2.aggregate_cipher_preview;
+        if (typeof updateCipherPreviewRows === 'function') {
+          updateCipherPreviewRows(s2.aggregate_cipher_preview);
+        } else {
+          ctPreview.textContent = s2.aggregate_cipher_preview;
+        }
       }
     }
 
@@ -1051,6 +1064,7 @@ class ModalitySelector {
   renderPrivacyStage(data) {
     const privacy = {
       ...(data.privacy_protection || {}),
+      aggregate_cipher_preview: data.aggregate_cipher_preview || data.step2?.aggregate_cipher_preview,
       plaintext_prompt: data.plaintext_prompt || data.llm_prompt || (data.step3 ? (data.step3.plaintext_prompt || data.step3.llm_prompt) : ""),
     };
     const tProtect = document.getElementById('tProtect');
@@ -1328,7 +1342,11 @@ class ModalitySelector {
       // 更新密文预览
       const ctPreview = document.getElementById('ctResPreview');
       if (ctPreview && s2.aggregate_cipher_preview) {
-        ctPreview.textContent = s2.aggregate_cipher_preview;
+        if (typeof updateCipherPreviewRows === 'function') {
+          updateCipherPreviewRows(s2.aggregate_cipher_preview);
+        } else {
+          ctPreview.textContent = s2.aggregate_cipher_preview;
+        }
       }
       console.log('✅ Rendered cluster');
     }

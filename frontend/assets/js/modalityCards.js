@@ -323,6 +323,10 @@ function hexToRgba(hex, alpha) {
 function drawSkeletonCard(canvasId, keypoints) {
   const canvas = document.getElementById(canvasId);
   if (!canvas || !keypoints) return null;
+  const normalizedKeypoints = Array.isArray(keypoints) && keypoints.length >= 75 && !Array.isArray(keypoints[0])
+    ? Array.from({ length: 25 }, (_, index) => keypoints.slice(index * 3, index * 3 + 3))
+    : keypoints;
+  if (!Array.isArray(normalizedKeypoints) || !Array.isArray(normalizedKeypoints[0])) return null;
 
   const ctx = canvas.getContext('2d');
   const width = canvas.width = canvas.offsetWidth * 2;
@@ -376,8 +380,8 @@ function drawSkeletonCard(canvasId, keypoints) {
   ];
 
   // 计算实际坐标范围并归一化到画布
-  const allX = keypoints.map(pt => pt[0]);
-  const allY = keypoints.map(pt => pt[1]);
+  const allX = normalizedKeypoints.map(pt => pt[0]);
+  const allY = normalizedKeypoints.map(pt => pt[1]);
   const minX = Math.min(...allX), maxX = Math.max(...allX);
   const minY = Math.min(...allY), maxY = Math.max(...allY);
 
@@ -396,7 +400,7 @@ function drawSkeletonCard(canvasId, keypoints) {
   const offsetX = (displayWidth - scaledWidth) / 2 - minX * scale;
   const offsetY = (displayHeight - scaledHeight) / 2 - minY * scale;
 
-  const points = keypoints.map(pt => {
+  const points = normalizedKeypoints.map(pt => {
     const x = pt[0] * scale + offsetX;
     const y = displayHeight - (pt[1] * scale + offsetY); // y轴翻转
     return [x, y];
@@ -652,30 +656,31 @@ function createModalityCard(modalityKey, modalityData) {
   const uploaded = Boolean(modalityData && modalityData.uploaded && modalityData.thumbnail);
   const defaultThumbnail = Boolean(!uploaded && modalityData && modalityData.thumbnail);
   const uploadedAttr = uploaded ? 'data-uploaded="true"' : 'data-uploaded="false"';
-  const showReplaceButton = config.type !== 'finance' && (
+  const showReplaceButton = (
     uploaded ||
     defaultThumbnail ||
+    config.type === 'finance' ||
     config.type === 'timeseries' ||
     config.type === 'skeleton'
   );
   const replaceButton = showReplaceButton
-    ? `<button class="modality-replace-btn" type="button" data-modality-upload="${config.id}">Replace</button>`
+    ? `<button class="modality-replace-btn" type="button" data-modality-upload="${config.id}">Select</button>`
     : '';
 
   let visualContent = '';
 
-  if (config.type === 'finance') {
-    visualContent = createFinancePreviewHTML(modalityData, config);
-    console.log(`💳 ${modalityKey} 卡片生成: 使用财务预览`);
-  } else if (uploaded) {
+  if (uploaded) {
     visualContent = `
       <div class="card-visual">
-        <img src="data:image/png;base64,${modalityData.thumbnail}"
+        <img src="data:image/png;base64,${escapeCardText(modalityData.thumbnail)}"
              alt="${config.name}"
              class="card-thumbnail" />
       </div>
     `;
     console.log(`✅ ${modalityKey} 卡片生成: 使用上传图片`);
+  } else if (config.type === 'finance') {
+    visualContent = createFinancePreviewHTML(modalityData, config);
+    console.log(`💳 ${modalityKey} 卡片生成: 使用财务预览`);
   } else if (config.type === 'image' && defaultThumbnail) {
     visualContent = `
       <div class="card-visual" data-default-preview="true">
@@ -716,7 +721,7 @@ function createModalityCard(modalityKey, modalityData) {
       ${replaceButton}
       <div class="card-title">${config.name}</div>
       ${visualContent}
-      ${config.type === 'finance' ? '' : `<input class="modality-upload-input" type="file" accept="image/*" data-modality-file="${config.id}" hidden />`}
+      <input class="modality-upload-input" type="file" accept="image/*" data-modality-file="${config.id}" hidden />
     </div>
   `;
 }

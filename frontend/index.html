@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Secure Multimodal HE + LLM Demo</title>
-  <link rel="stylesheet" href="./assets/css/styles.css?v=63"/>
+  <link rel="stylesheet" href="./assets/css/styles.css?v=64"/>
   <link rel="stylesheet" href="./assets/css/enhancement.css?v=15"/>
 </head>
 <body>
@@ -21,7 +21,7 @@
       <ol class="stepper" aria-label="Workflow steps">
         <li class="step active" data-step="select"><span>1</span><span class="step-label" id="stepSelectLabel">Select Medical Data</span></li>
         <li class="step" data-step="model"><span>2</span>Local Encoders</li>
-        <li class="step" data-step="privacy"><span>3</span>Shuffle</li>
+        <li class="step" data-step="privacy"><span>3</span>MyGPTShield Server</li>
         <li class="step" data-step="llm"><span>4</span>Send to LLM</li>
         <li class="step" data-step="report"><span>5</span>Report</li>
       </ol>
@@ -87,10 +87,6 @@
                 <!-- filled by JS -->
               </div>
             </div>
-            <details class="cipher-panel">
-              <summary>Encrypted ciphertext preview</summary>
-              <div class="v mono" id="ctResPreview">—</div>
-            </details>
           </div>
           <div class="spinnerOverlay" id="spinDispatch">
             <div class="spinner"></div><div class="spinText">Encoding + dispatching to local encoders...</div>
@@ -100,7 +96,7 @@
         <section class="panel panel-privacy workflow-panel" id="stepProtect">
           <div class="panel-head">
             <div>
-              <h2>Shuffle</h2>
+              <h2>MyGPTShield Server</h2>
             </div>
             <span class="pill" id="tProtect">—</span>
           </div>
@@ -159,8 +155,8 @@
     </section>
   </main>
 
-  <script src="./assets/js/modalityCards.js?v=26"></script>
-  <script src="./assets/js/modality-selector.js?v=50"></script>
-  <script src="./assets/js/app.js?v=59"></script>
+  <script src="./assets/js/modalityCards.js?v=29"></script>
+  <script src="./assets/js/modality-selector.js?v=51"></script>
+  <script src="./assets/js/app.js?v=60"></script>
 </body>
 </html>

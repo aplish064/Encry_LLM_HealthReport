@@ -1,10 +1,10 @@
-# Secure Multimodal Health Monitoring System (HE + LLM Demo)
+# MyGPTShield: Secure Multimodal HE + LLM Demo
 
-A privacy-preserving multimodal health monitoring system demonstration using Homomorphic Encryption and Large Language Models.
+A privacy-preserving multimodal inference demo using Homomorphic Encryption and Large Language Models. The current app includes both healthcare monitoring and personal finance risk scenes.
 
 ## 📋 Overview
 
-This system demonstrates a complete **privacy-preserving health monitoring pipeline**, from local multimodal sensor data collection, through encrypted inference, to clinical report generation—all while protecting user privacy.
+This system demonstrates a complete **privacy-preserving multimodal inference pipeline**, from local data selection, through encrypted inference and MyGPTShield Server anonymization, to protected report generation.
 
 ### Core Pipeline
 
@@ -13,18 +13,22 @@ This system demonstrates a complete **privacy-preserving health monitoring pipel
     ↓
 🔐 Homomorphic Encryption (CKKS)
     ↓
-🤖 DeepSeek LLM Smart Dispatch
+🤖 Local Encoder Dispatch
     ↓
 🔧 Homomorphic Inference Model Cluster (MCP Tools)
     ↓
-📈 Local Decryption + Clinical Report Generation
+🛡️ MyGPTShield Server Privacy Shuffle
+    ↓
+📈 Protected Report Generation
 ```
 
 ## 🎯 Key Features
 
-### 1. Multi-Modal Data Support
+### 1. Multi-Scene Data Support
 
-The system supports 5 sensor modalities:
+The system supports healthcare and finance scenes.
+
+Healthcare modalities:
 
 | Modality | Data Type | Purpose | Data Source |
 |----------|-----------|---------|-------------|
@@ -33,6 +37,22 @@ The system supports 5 sensor modalities:
 | **IMU** | Inertial Measurement Unit | Gait analysis, metabolic assessment | Real IMU sensor data |
 | **CSI** | Channel State Information | Heart rate/respiratory monitoring | Simulated WiFi CSI data |
 | **RGB** | Color Image | Risk scoring, fall detection | Real RGB camera data |
+| **NTU** | Skeleton | Action recognition | Generated fallback data |
+| **Retina** | Medical image | Cardiovascular risk proxy | Optional NPZ/upload |
+| **Chest** | Medical image | Lung condition screening | Optional NPZ/upload |
+| **Pathology** | Medical image | Cancer screening | Optional NPZ/upload |
+| **Blood** | Medical image | Hematology screening | Optional NPZ/upload |
+
+Finance modalities:
+
+| Modality | Data Type | Purpose |
+|----------|-----------|---------|
+| **Income** | Numeric finance signal | Earning capacity baseline |
+| **Expenses** | Numeric finance signal | Monthly spending burden |
+| **Savings** | Numeric finance signal | Liquidity resilience |
+| **Loan** | Mixed finance signal | Repayment pressure |
+| **Credit** | Numeric finance signal | Credit and leverage risk |
+| **Profile** | Categorical finance signal | Employment and regional context |
 
 ### 2. Homomorphic Encrypted Inference
 - Uses **CKKS (Cheon-Kim-Kim-Song)** scheme
@@ -40,14 +60,15 @@ The system supports 5 sensor modalities:
 - Feature vectors are processed in encrypted form
 - Server cannot access plaintext data
 
-### 3. LLM-Based Smart Dispatch
-- Powered by **DeepSeek** LLM
-- Automatically assigns optimal inference tools for each modality
-- Dynamic optimization of model cluster resources
+### 3. Local Encoders + Optional LLM Report Generation
+- Dispatches selected modalities to specialized local encoders
+- Supports external LLM providers when credentials are configured
+- Falls back to built-in report generation when no external LLM is configured
 
 ### 4. Rich Visualizations
 - **Spectrum Analysis**: FFT spectra and spectrograms
-- **Health Reports**: Fall risk, vital signs, activity analysis
+- **Healthcare Reports**: Fall risk, vital signs, activity analysis
+- **Finance Reports**: Resilience, cashflow burden, loan stress, and credit risk
 - **Interactive Dashboard**: Radar charts, donuts, progress bars, etc.
 
 ## 📊 Data Sources
@@ -87,6 +108,7 @@ Supported dataset files:
 - `Matplotlib` - Data visualization
 - `MCP (Model Context Protocol)` - Tool protocol
 - `OpenAI SDK` - LLM interface
+- `PyTorch` - Optional; the demo has a NumPy fallback for lightweight local runs
 
 **Frontend**:
 - Vanilla HTML/CSS/JavaScript
@@ -101,103 +123,122 @@ web_v9_healthreport/
 │   ├── app.py              # FastAPI main application
 │   ├── server.py           # MCP tool server
 │   ├── reference_clinet.py # Reference client
-│   └── requirements.txt    # Python dependencies
+│   ├── requirements-lite.txt # Recommended local demo dependencies
+│   └── requirements.txt    # Full dependencies, including optional torch
 ├── frontend/
 │   ├── index.html          # Main page
-│   ├── test_gauge.html     # Test page
 │   └── assets/
 │       ├── css/styles.css  # Stylesheets
 │       ├── js/app.js       # Frontend logic
 │       ├── icons/          # Icon resources
 │       └── user/           # User uploaded images
-├── scripts/
-│   ├── generate_data.py              # Data generation script
-│   └── generate_multimodal_data.py   # Multimodal data generator
-├── FL-Datasets-for-HAR/    # Real datasets (need to unzip)
-├── uwb_walk.txt            # UWB walking data
-├── imu_walk.txt            # IMU walking data
-└── HAR_train.txt           # HAR training data
+├── test_data/              # Optional local data and finance CSV
+├── test_data_backup/       # Backup medical image samples
+└── docs/                   # Planning/spec artifacts
 ```
 
 ## 🚀 Quick Start
 
 ### Requirements
 
-- Python 3.8+
+- Python 3.10+ recommended
 - pip package manager
 - Modern browser (Chrome/Firefox/Edge)
+- Linux/macOS shell commands below use `python3`; on Windows, use `python`
 
-### 1. Install Dependencies
+### 1. Create a Virtual Environment
+
+```bash
+cd /path/to/Encry_LLM_HealthReport
+python3 -m venv venv
+source venv/bin/activate
+```
+
+If `python3 -m venv` fails on Ubuntu/Debian with `ensurepip is not available`, install the system venv package first:
+
+```bash
+sudo apt update
+sudo apt install -y python3.10-venv
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 2. Install Dependencies
+
+For most local demo runs, install the lightweight dependency set. It skips `torch`; the backend will use the built-in NumPy fallback model path.
+
+```bash
+pip install -r backend/requirements-lite.txt
+```
+
+If you specifically want the full optional PyTorch model dependency, install:
+
+```bash
+pip install -r backend/requirements.txt
+```
+
+### 3. Start the Backend
+
+Use port `8082`:
 
 ```bash
 cd backend
-pip install -r requirements.txt
+MPLCONFIGDIR=/tmp/matplotlib-cache ../venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8082
 ```
 
-Required packages:
-- fastapi
-- uvicorn
-- numpy
-- tenseal
-- mcp
-- openai
-- matplotlib
-- torch
+Leave this terminal running.
 
-### 2. Start Backend Server
+### 4. Start the Frontend
 
-**Option 1: Direct Start (with simulated data)**
+Open a second terminal:
 
 ```bash
-cd backend
-uvicorn app:app --host 127.0.0.1 --port 8080
+cd /path/to/Encry_LLM_HealthReport
+source venv/bin/activate
+cd frontend
+../venv/bin/python -m http.server 8001 --bind 127.0.0.1
 ```
 
-**Option 2: Configure DeepSeek API (with real LLM dispatch)**
+Open in browser:
 
-Windows PowerShell:
-```powershell
-$env:DEEPSEEK_API_KEY="your-api-key-here"
-$env:DEEPSEEK_BASE_URL="https://api.deepseek.com"
-$env:DEEPSEEK_MODEL="deepseek-chat"
-cd backend
-uvicorn app:app --host 127.0.0.1 --port 8080
+```text
+http://127.0.0.1:8001
 ```
 
-Linux/Mac:
+### 5. Verify the Services
+
+```bash
+curl http://127.0.0.1:8082/api/health
+curl "http://127.0.0.1:8082/api/modalities?scenario=finance"
+```
+
+Expected behavior:
+- The frontend loads at `http://127.0.0.1:8001`
+- Backend health returns JSON with `"status": "healthy"`
+- You can switch between `Healthcare` and `Finance`
+- Healthcare and finance cards support `Select` uploads
+- The MyGPTShield Server step shows streaming ciphertext previews
+
+### Optional LLM Configuration
+
+The demo can run without external LLM credentials by using built-in fallback report generation. To call a compatible external provider, set environment variables before starting the backend:
+
 ```bash
 export DEEPSEEK_API_KEY="your-api-key-here"
 export DEEPSEEK_BASE_URL="https://api.deepseek.com"
 export DEEPSEEK_MODEL="deepseek-chat"
-cd backend
-uvicorn app:app --host 127.0.0.1 --port 8080
 ```
-
-### 3. Start Frontend Server
-
-**Open a new terminal**:
-
-```bash
-cd frontend
-python -m http.server 8001
-```
-
-### 4. Access the System
-
-Open in browser: **http://127.0.0.1:8001**
-
-The system will automatically start the data collection and inference cycle.
 
 ## 🖥️ User Interface
 
-### Step 1: Local Multimodal Data Stream
-- **Data Preview**: Real-time preview of 5 modalities (Depth, UWB, IMU, CSI, RGB)
-- **Spectrum Analysis**: Switch between UWB/IMU/CSI FFT spectra and spectrograms
-- **Statistics**: Display statistics for each modality (mean, std, shape, etc.)
+### Step 1: Select Data
+- **Healthcare scene**: Select medical/sensor modalities such as Depth, UWB, IMU, CSI, RGB, NTU, Retina, Chest, Pathology, and Blood.
+- **Finance scene**: Select finance signals such as Income, Expenses, Savings, Loan, Credit, and Profile.
+- **Uploads**: Use `Select` on a card to upload a replacement image preview for healthcare or finance cards.
 
-### Step 2: DeepSeek Dispatch → Homomorphic Prediction Cluster
-- **LLM Dispatch**: DeepSeek intelligently assigns each modality to optimal inference tools
-- **Model Cluster**: 6 specialized homomorphic inference models
+### Step 2: Local Encoders
+- **Dispatch**: Selected data are dispatched to specialized local encoders.
+- **Model Cluster**: Specialized homomorphic inference models include:
   - ECG Arrhythmia - Arrhythmia detection
   - Blood Pressure - Blood pressure prediction
   - Sleep Staging - Sleep stage estimation
@@ -206,7 +247,12 @@ The system will automatically start the data collection and inference cycle.
   - Anomaly Check - Anomaly detection
 - **Encrypted Inference**: Display aggregated ciphertext preview
 
-### Step 3: Clinical Report Generation
+### Step 3: MyGPTShield Server
+- **Ciphertext preview**: The encoded model output card streams multiple ciphertext previews before the synthetic database card appears.
+- **Synthetic database**: The system generates synthetic peers and masks the real record in the distribution.
+- **Privacy shuffle**: The real record is anonymized before a bucketed summary is sent to the selected LLM.
+
+### Step 4: Protected Report Generation
 - **Key Results**: Model inference results table (model name, input modality, score, status)
 - **Recommendations**: Personalized health recommendations
 - **Conclusion**: Comprehensive health report including:
@@ -215,6 +261,7 @@ The system will automatically start the data collection and inference cycle.
   - Multi-dimensional health scores (radar chart)
   - Vital signs comparison (bar chart)
   - Detailed metric cards (heart rate, respiratory rate, blood pressure, SpO2, etc.)
+  - Finance risk summaries when the Finance scene is selected
 
 ## 🔐 Homomorphic Encryption Technical Details
 
@@ -260,7 +307,11 @@ Visit **http://127.0.0.1:8001/test_gauge.html** to view:
 ### API Endpoints
 
 - `GET /api/health` - Health check
-- `GET /api/cycle` - Complete data collection → inference → report generation cycle
+- `GET /api/modalities?scenario=healthcare|finance` - Data card definitions
+- `GET /api/dispatch?scenario=...&selected_modalities=...` - Step 1/2 dispatch and encrypted inference
+- `GET /api/privacy_shuffle?session_id=...` - Synthetic database and MyGPTShield Server privacy step
+- `GET /api/report?session_id=...&llm_provider=...` - Protected report generation
+- `GET /api/cycle` - Legacy complete cycle endpoint
 
 ## ⚙️ Configuration
 
@@ -270,21 +321,29 @@ Modify path configuration in `backend/app.py`:
 
 ```python
 DATA_PATHS = {
-    "UWB": os.path.join(BASE_DIR, "uwb_walk.txt"),
-    "IMU": os.path.join(BASE_DIR, "imu_walk.txt"),
+    "UWB": os.path.join(BASE_DIR, "test_data", "uwb_sample.txt"),
+    "IMU": os.path.join(BASE_DIR, "test_data", "imu_sample.txt"),
+    "CSI": os.path.join(BASE_DIR, "test_data", "csi_sample.csv"),
 }
 
 DEPTH_PNG_PATH = os.path.join(ASSET_USER_DIR, "deep2.png")
 RGB_PNG_PATH = os.path.join(ASSET_USER_DIR, "RGB.png")
 ```
 
-### Adjust Refresh Rate
+If UWB/IMU/CSI sample files are missing, the backend generates deterministic fallback time-series data so the demo still runs.
 
-Modify the last line in `frontend/assets/js/app.js`:
+### Frontend Backend URL
 
 ```javascript
-setInterval(runCycle, 10000); // Refresh every 10 seconds (10000 ms)
+// frontend/assets/js/app.js
+const API_BASE = window.API_BASE || (
+  window.location.port === "8001"
+    ? `${window.location.protocol}//${window.location.hostname}:8082`
+    : ""
+);
 ```
+
+Keep the frontend on `8001` and backend on `8082` unless you also update this API base logic.
 
 ## 📈 Performance Metrics
 
@@ -308,11 +367,30 @@ setInterval(runCycle, 10000); // Refresh every 10 seconds (10000 ms)
 
 ## 🛠️ Troubleshooting
 
+### `python3 -m venv venv` Fails
+
+**Issue**: `ensurepip is not available`
+
+**Solution**:
+```bash
+sudo apt update
+sudo apt install -y python3.10-venv
+python3 -m venv venv
+source venv/bin/activate
+```
+
 ### Backend Startup Failure
 
 **Issue**: `ModuleNotFoundError`
 
 **Solution**:
+```bash
+source venv/bin/activate
+pip install -r backend/requirements-lite.txt
+```
+
+If the missing module is `torch`, you can either install the full dependency file or keep using the lightweight path. The current backend supports a NumPy fallback when torch is absent.
+
 ```bash
 pip install -r backend/requirements.txt
 ```
@@ -322,9 +400,23 @@ pip install -r backend/requirements.txt
 **Issue**: CORS error or connection refused
 
 **Solution**:
-1. Confirm backend is running on port 8080
+1. Confirm backend is running on port `8082`
 2. Check `API_BASE` in `frontend/assets/js/app.js`
 3. Ensure firewall allows local connections
+4. Confirm the frontend is served from `http://127.0.0.1:8001`
+
+### Port Already in Use
+
+**Issue**: `Address already in use`
+
+**Solution**:
+```bash
+# Linux/macOS
+lsof -i :8082
+lsof -i :8001
+```
+
+Stop the old process or choose another allowed backend port such as `8083`, then update `API_BASE` accordingly.
 
 ### Charts Not Displaying
 
@@ -333,10 +425,20 @@ pip install -r backend/requirements.txt
 **Solution**:
 1. Open browser DevTools (F12)
 2. Check Console tab for errors
-3. Check Network tab, confirm `/api/cycle` request succeeds
+3. Check Network tab, confirm `/api/dispatch`, `/api/privacy_shuffle`, and `/api/report` requests succeed
 4. Look for Console logs:
    - `"Step 3 data:"` - should show complete data
    - `"renderResults called with rows:"` - should show 5 results
+
+### Finance or Healthcare Upload Fails
+
+**Issue**: Selecting an image on a card returns an upload error
+
+**Solution**:
+1. Use PNG/JPEG/WebP images under 8 MB
+2. Confirm the backend is running on `8082`
+3. Check `POST /api/upload_medical_image` in the browser Network tab
+4. Finance uploads are used as UI previews; they do not need to be written to disk for analysis
 
 ### TenSEAL Installation Issues
 
@@ -437,19 +539,26 @@ Dataset copyrights belong to the original authors. Please follow their respectiv
 
 ## 🔍 System Workflow Details
 
-### Phase 1: Data Collection (Step 1)
-- Collect sensor data from 5 modalities
+### Phase 1: Data Selection (Step 1)
+- Select healthcare or finance data cards
+- Optionally upload image previews with each card's `Select` control
 - Generate sparkline previews for quick visual inspection
 - Compute frequency spectrum analysis (FFT)
 - Display time-frequency spectrograms (CSI only)
 
-### Phase 2: Encryption & Dispatch (Step 2)
+### Phase 2: Encryption & Local Encoders (Step 2)
 - Extract 8-dimensional features from each modality
 - Encrypt features using CKKS homomorphic encryption
-- DeepSeek LLM analyzes modalities and dispatches to appropriate tools
+- Dispatch selected modalities to local encoder tools
 - Execute encrypted inference using MCP tool cluster
 
-### Phase 3: Report Generation (Step 3)
+### Phase 3: MyGPTShield Server (Step 3)
+- Stream multiple ciphertext previews in the encoded output card
+- Generate a synthetic peer database
+- Shuffle and anonymize the real record before LLM summarization
+- Send only a bucketed protected summary to the selected LLM
+
+### Phase 4: Report Generation (Step 4)
 - Decrypt inference results locally
 - Synthesize health metrics (demo estimators):
   - Heart rate from CSI rhythm band
@@ -468,8 +577,8 @@ Dataset copyrights belong to the original authors. Please follow their respectiv
 
 ---
 
-**Last Updated**: 2026-02-27
-**Version**: v9 (Multimodal + Spectrum Analysis Enhanced)
+**Last Updated**: 2026-05-12
+**Version**: MyGPTShield demo with healthcare and finance scenes
 
 ## 🌟 Acknowledgments
 

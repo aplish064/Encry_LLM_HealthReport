@@ -693,6 +693,87 @@ let privacyAnimationTimer = null;
 let privacyAnimationFrame = null;
 let privacyAnimationRenderId = 0;
 
+function shiftCipherPreviewText(text, offset) {
+  const lowerHex = "0123456789abcdef";
+  const upperHex = "0123456789ABCDEF";
+  return String(text).replace(/[0-9a-f]/g, (ch) => {
+    const table = ch === ch.toUpperCase() ? upperHex : lowerHex;
+    const index = table.indexOf(ch);
+    return index >= 0 ? table[(index + offset) % table.length] : ch;
+  });
+}
+
+function buildCipherPreviewItems(cipherText) {
+  const base = safeText(cipherText, "—").trim() || "—";
+  return [
+    { label: "ct[0]", text: base },
+    { label: "ct[1]", text: shiftCipherPreviewText(base, 3) },
+    { label: "ct[2]", text: shiftCipherPreviewText(base, 7) },
+  ];
+}
+
+function renderCipherPreviewRows(cipherText, streaming = false) {
+  const rows = buildCipherPreviewItems(cipherText).map((item) => `
+    <div class="cipherStreamRow">
+      <span>${escHtml(item.label)}</span>
+      <code data-cipher-stream-row data-full="${escHtml(item.text)}">${streaming ? "" : escHtml(item.text)}</code>
+    </div>
+  `).join("");
+  return `
+    <div class="cipherStreamList" id="ctResPreview" aria-label="Encrypted ciphertext previews">
+      ${rows}
+      <div class="cipherStreamRow cipherStreamMore">
+        <span>ct[n]</span>
+        <code>...</code>
+      </div>
+    </div>
+  `;
+}
+
+function updateCipherPreviewRows(cipherText, streaming = false) {
+  const container = $("ctResPreview");
+  if (!container) return;
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = renderCipherPreviewRows(cipherText, streaming).trim();
+  container.replaceWith(wrapper.firstElementChild);
+}
+
+function startCipherPreviewStream(panel) {
+  const rows = Array.from(panel.querySelectorAll("[data-cipher-stream-row]"));
+  if (!rows.length) {
+    panel.classList.remove("is-cipher-streaming");
+    panel.classList.add("cipher-stream-ready");
+    return;
+  }
+
+  privacyAnimationRenderId += 1;
+  const renderId = privacyAnimationRenderId;
+  const durationMs = 1450;
+  const start = performance.now();
+  panel.classList.add("is-cipher-streaming");
+
+  const tick = (now) => {
+    if (renderId !== privacyAnimationRenderId) return;
+    const progress = Math.min(1, (now - start) / durationMs);
+    rows.forEach((row) => {
+      const full = row.dataset.full || "";
+      const count = Math.ceil(full.length * progress);
+      row.textContent = full.slice(0, count);
+    });
+
+    if (progress < 1) {
+      privacyAnimationFrame = window.requestAnimationFrame(tick);
+      return;
+    }
+
+    panel.classList.remove("is-cipher-streaming");
+    panel.classList.add("cipher-stream-ready");
+    privacyAnimationFrame = null;
+  };
+
+  privacyAnimationFrame = window.requestAnimationFrame(tick);
+}
+
 function renderPrivacyProtection(privacy) {
   const panel = $("privacyPanel");
   if (!panel) return;
@@ -705,7 +786,7 @@ function renderPrivacyProtection(privacy) {
     window.clearTimeout(privacyAnimationTimer);
     privacyAnimationTimer = null;
   }
-  panel.classList.remove("is-playing", "is-idle", "is-complete", "step-by-step");
+  panel.classList.remove("is-playing", "is-idle", "is-complete", "step-by-step", "is-cipher-streaming", "cipher-stream-ready");
 
   if (!privacy || !privacy.enabled) {
     panel.innerHTML = '<div class="hint">Protected privacy data is unavailable.</div>';
@@ -719,6 +800,10 @@ function renderPrivacyProtection(privacy) {
   const privacyMetricText = isFinanceDomain
     ? "Model scores / financial buckets / risk profile"
     : "Model scores / physiological metrics / risk profile";
+  const encryptedCipherPreview = safeText(
+    privacy.aggregate_cipher_preview || privacy.ciphertext_preview || privacy.cipher_preview,
+    "—"
+  );
   const distributionSummary = privacy.distribution_summary || {};
   const valueHistogram = Array.isArray(distributionSummary.value_histogram)
     ? distributionSummary.value_histogram
@@ -900,18 +985,10 @@ function renderPrivacyProtection(privacy) {
         <div class="mixerLabel">1. Encoded model outputs</div>
         <div class="rawResultCard rawProfileCard">
           <strong>Encoded Inference Output</strong>
-          <div class="rawProfileMetaRow">
-            <span>${escHtml(privacyMetricText)}</span>
-            <div class="profileLockChip">Encoded profile</div>
-          </div>
-          <div class="rawProfileBars">
-            <span style="--w:88%"></span>
-            <span style="--w:67%"></span>
-            <span style="--w:74%"></span>
-          </div>
-          <div class="backendTokenStrip">
-            <span>backend token</span>
-            <code>${escHtml(tokenFlow.generation || "H(session_seed, real_id, nonce)")}</code>
+          <span class="encodedOutputMeta">${escHtml(privacyMetricText)}</span>
+          <div class="encodedCipherPreview">
+            <div class="encodedCipherPreviewHead">Encrypted ciphertext preview</div>
+            ${renderCipherPreviewRows(encryptedCipherPreview, true)}
           </div>
         </div>
       </div>
@@ -946,6 +1023,7 @@ function renderPrivacyProtection(privacy) {
     </div>
   `;
   panel.classList.add("step-by-step");
+  startCipherPreviewStream(panel);
 }
 
 function renderLegacyHealthReport(report, plaintextPrompt) {
@@ -1180,7 +1258,7 @@ async function runCycle() {
 
     // step 2
     const s2 = data.step2 || {};
-$("ctResPreview").textContent = safeText(s2.aggregate_cipher_preview);
+    updateCipherPreviewRows(s2.aggregate_cipher_preview);
 
     renderCluster(s2.cluster_models || [], s2.assignments || []);
     setPill("tDispatch", `dispatch+infer ${fmtSec(s2.time_sec)}`);
@@ -1189,6 +1267,7 @@ $("ctResPreview").textContent = safeText(s2.aggregate_cipher_preview);
     const s3 = data.step3 || {};
     const privacy = {
       ...(data.privacy_protection || {}),
+      aggregate_cipher_preview: s2.aggregate_cipher_preview,
       plaintext_prompt: s3.plaintext_prompt || s3.llm_prompt,
     };
     renderPrivacyProtection(privacy);

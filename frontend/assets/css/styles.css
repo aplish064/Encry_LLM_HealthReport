@@ -2834,6 +2834,24 @@ body {
 .privacyPanel.step-by-step .arrowToOutput { animation-delay: 1300ms; }
 .privacyPanel.step-by-step .mixerProtected { animation-delay: 1560ms; }
 
+.privacyPanel.step-by-step.is-cipher-streaming .arrowToPool,
+.privacyPanel.step-by-step.is-cipher-streaming .mixerPool,
+.privacyPanel.step-by-step.is-cipher-streaming .arrowToShuffle,
+.privacyPanel.step-by-step.is-cipher-streaming .mixerShuffle,
+.privacyPanel.step-by-step.is-cipher-streaming .arrowToOutput,
+.privacyPanel.step-by-step.is-cipher-streaming .mixerProtected {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: none;
+}
+
+.privacyPanel.step-by-step.cipher-stream-ready .arrowToPool { animation-delay: 0ms; }
+.privacyPanel.step-by-step.cipher-stream-ready .mixerPool { animation-delay: 180ms; }
+.privacyPanel.step-by-step.cipher-stream-ready .arrowToShuffle { animation-delay: 440ms; }
+.privacyPanel.step-by-step.cipher-stream-ready .mixerShuffle { animation-delay: 700ms; }
+.privacyPanel.step-by-step.cipher-stream-ready .arrowToOutput { animation-delay: 960ms; }
+.privacyPanel.step-by-step.cipher-stream-ready .mixerProtected { animation-delay: 1220ms; }
+
 .privacyPanel .privacyStageOverlay {
   display: none !important;
 }
@@ -3038,6 +3056,65 @@ body {
 .rawProfileCard {
   display: grid;
   gap: 7px;
+}
+
+.encodedOutputMeta {
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+.encodedCipherPreview {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(37, 99, 235, 0.17);
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.encodedCipherPreviewHead {
+  color: #1d4ed8;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.cipherStreamList {
+  max-height: 132px;
+  overflow: auto;
+  display: grid;
+  gap: 5px;
+}
+
+.cipherStreamRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+}
+
+.cipherStreamRow span {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
+.cipherStreamRow code {
+  max-height: 102px;
+  margin: 0;
+  color: #0f172a;
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.cipherStreamMore code,
+.cipherStreamMore span {
+  color: #1d4ed8;
 }
 
 .rawProfileBars {
