@@ -16,18 +16,6 @@ __pycache__/
 *.swp
 *.swo
 
-# Data files
-FL-Datasets-for-HAR/
-test_data/*
-generated_charts/
-sample_data/
-*.txt
-*.csv
-!test_data/
-!test_data/synthetic_personal_finance_dataset.csv
-!requirements.txt
-!README*.txt
-!QUICKSTART.txt
 
 # Generated files
 test_response.json
@@ -43,5 +31,4 @@ desktop.ini
 *.bak
 *~
 
-dataset/
 temp/

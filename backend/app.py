@@ -339,16 +339,16 @@ LLM_PROVIDER_OPTIONS = {
 
 # 本地编码器配置
 CLUSTER_MODELS = [
-    {"id": "sleep", "title": "Gesture Recognition", "subtitle": "Depth / 1CNN+FC"},
-    {"id": "bp", "title": "Human Movement Detection", "subtitle": "UWB / 1FC"},
-    {"id": "metabolic", "title": "Walking Activity Recognition", "subtitle": "IMU / 2FC"},
-    {"id": "ecg", "title": "Human Activity Recognition", "subtitle": "CSI / 3FC"},
-    {"id": "risk", "title": "Fall Detection", "subtitle": "RGB / 1CNN+2FC"},
-    {"id": "action", "title": "Human Action Recognition", "subtitle": "NTU / ST-GCN"},
-    {"id": "cardio", "title": "Retina Screening", "subtitle": "Fundus / CNN+FC"},
-    {"id": "lung", "title": "Chest Screening", "subtitle": "X-ray / CNN+FC"},
-    {"id": "cancer", "title": "Pathology Screening", "subtitle": "Microscopy / CNN+FC"},
-    {"id": "blood", "title": "Blood Cell Screening", "subtitle": "Smear / CNN+FC"},
+    {"id": "sleep", "title": "Gesture Recognition", "subtitle": "Depth"},
+    {"id": "bp", "title": "Human Movement Detection", "subtitle": "UWB"},
+    {"id": "metabolic", "title": "Walking Activity Recognition", "subtitle": "IMU"},
+    {"id": "ecg", "title": "Human Activity Recognition", "subtitle": "CSI"},
+    {"id": "risk", "title": "Fall Detection", "subtitle": "RGB"},
+    {"id": "action", "title": "Human Action Recognition", "subtitle": "NTU"},
+    {"id": "cardio", "title": "Retina Screening", "subtitle": "Fundus"},
+    {"id": "lung", "title": "Chest Screening", "subtitle": "X-ray"},
+    {"id": "cancer", "title": "Pathology Screening", "subtitle": "Microscopy"},
+    {"id": "blood", "title": "Blood Cell Screening", "subtitle": "Smear"},
 ]
 
 HEALTH_TASK_RESULTS = {
