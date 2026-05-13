@@ -1541,12 +1541,26 @@ select {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: 82px;
+  min-height: 48px;
+  gap: 5px;
+}
+
+#stepDecrypt .compactStabilityTop{
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   gap: 8px;
 }
 
-#stepDecrypt .compactStabilityScore{
-  font-size: 24px;
+#stepDecrypt .compactStabilityTop span{
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+#stepDecrypt .compactStabilityTop strong{
+  font-size: 18px;
   line-height: 1;
   font-weight: 950;
   letter-spacing: 0;
@@ -1554,7 +1568,7 @@ select {
 }
 
 #stepDecrypt .compactStabilityTrack{
-  height: 12px;
+  height: 8px;
   border-radius: 999px;
   background: #e5e7eb;
   overflow: hidden;
@@ -1569,8 +1583,16 @@ select {
 
 #stepDecrypt .compactStabilityMeta{
   color: var(--muted);
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1.25;
+}
+
+#stepDecrypt .story-mobility .storyChart{
+  padding: 6px;
+}
+
+#stepDecrypt .story-mobility .compactStability{
+  min-height: 42px;
 }
 
 #stepDecrypt .compact-activity .compactChart svg{

@@ -149,6 +149,15 @@ FINANCE_CLUSTER_MODELS = [
     {"id": "profile_context", "title": "Profile Context", "subtitle": "Employment context model"},
 ]
 
+FINANCE_RESULT_META = {
+    "income_capacity": {"application": "Income Capacity", "model_arch": "Income Encoder"},
+    "expense_burden": {"application": "Expense Burden", "model_arch": "Cashflow Encoder"},
+    "savings_resilience": {"application": "Savings Resilience", "model_arch": "Liquidity Encoder"},
+    "loan_stress": {"application": "Loan Stress", "model_arch": "Repayment Encoder"},
+    "credit_risk": {"application": "Credit Risk", "model_arch": "Credit Encoder"},
+    "profile_context": {"application": "Profile Context", "model_arch": "Context Encoder"},
+}
+
 ASSET_USER_DIR = os.path.join(BASE_DIR, "frontend", "assets", "user")
 USER_UPLOAD_DIR = os.path.join(ASSET_USER_DIR, "uploads")
 DEPTH_PNG_PATH = os.path.join(ASSET_USER_DIR, "deep2.png")
@@ -330,17 +339,155 @@ LLM_PROVIDER_OPTIONS = {
 
 # 本地编码器配置
 CLUSTER_MODELS = [
-    {"id": "ecg", "title": "ECG Arrhythmia", "subtitle": "CSI Heart Pattern"},
-    {"id": "bp", "title": "Blood Pressure", "subtitle": "UWB Regression"},
-    {"id": "sleep", "title": "Sleep Staging", "subtitle": "Depth-based Model"},
-    {"id": "metabolic", "title": "Metabolic Score", "subtitle": "IMU Proxy"},
-    {"id": "risk", "title": "Risk Assessment", "subtitle": "RGB Triage"},
-    {"id": "action", "title": "Action Recognition", "subtitle": "Skeleton Model"},
-    {"id": "cardio", "title": "Cardiovascular", "subtitle": "Retina Analysis"},
-    {"id": "lung", "title": "Lung Screening", "subtitle": "X-ray Analysis"},
-    {"id": "cancer", "title": "Cancer Detection", "subtitle": "Pathology Model"},
-    {"id": "blood", "title": "Blood Analysis", "subtitle": "Hematology Model"},
+    {"id": "sleep", "title": "Gesture Recognition", "subtitle": "Depth / 1CNN+FC"},
+    {"id": "bp", "title": "Human Movement Detection", "subtitle": "UWB / 1FC"},
+    {"id": "metabolic", "title": "Walking Activity Recognition", "subtitle": "IMU / 2FC"},
+    {"id": "ecg", "title": "Human Activity Recognition", "subtitle": "CSI / 3FC"},
+    {"id": "risk", "title": "Fall Detection", "subtitle": "RGB / 1CNN+2FC"},
+    {"id": "action", "title": "Human Action Recognition", "subtitle": "NTU / ST-GCN"},
+    {"id": "cardio", "title": "Retina Screening", "subtitle": "Fundus / CNN+FC"},
+    {"id": "lung", "title": "Chest Screening", "subtitle": "X-ray / CNN+FC"},
+    {"id": "cancer", "title": "Pathology Screening", "subtitle": "Microscopy / CNN+FC"},
+    {"id": "blood", "title": "Blood Cell Screening", "subtitle": "Smear / CNN+FC"},
 ]
+
+HEALTH_TASK_RESULTS = {
+    "sleep": {
+        "application": "Gesture Recognition",
+        "task": "Good/ok/victory/stop/fist",
+        "sensor": "PicoZense DCAM710",
+        "model_arch": "1CNN+FC",
+        "prediction": "ok",
+        "data_dim": "(36,36)",
+        "subjects": "9",
+        "data_records": "7,422",
+    },
+    "bp": {
+        "application": "Human Movement Detection",
+        "task": "With/without Human Movement",
+        "sensor": "Decawave DWM1000 UWB",
+        "model_arch": "1FC",
+        "prediction": "with Human Movement",
+        "data_dim": "(1,55)",
+        "subjects": "8",
+        "data_records": "663",
+    },
+    "metabolic": {
+        "application": "Walking Activity Recognition",
+        "task": "Walking on corridors/upstairs/downstairs",
+        "sensor": "LPMS-B2 IMU",
+        "model_arch": "2FC",
+        "prediction": "walking on corridors",
+        "data_dim": "(1,900)",
+        "subjects": "7",
+        "data_records": "1,369",
+    },
+    "ecg": {
+        "application": "Human Activity Recognition",
+        "task": "Box/circle/clean/Fall/run/walk",
+        "sensor": "Atheros CSI Tool",
+        "model_arch": "3FC",
+        "prediction": "walk",
+        "data_dim": "(3,114,500)",
+        "subjects": "20",
+        "data_records": "1,200",
+    },
+    "risk": {
+        "application": "Fall Detection",
+        "task": "Fall/Not Fall",
+        "sensor": "Camera",
+        "model_arch": "1CNN+2FC",
+        "prediction": "Fall",
+        "data_dim": "(3,64,64)",
+        "subjects": "20",
+        "data_records": "1,000",
+    },
+    "action": {
+        "application": "Human Action Recognition",
+        "task": "NTU skeleton action classification",
+        "sensor": "RGB-D Skeleton",
+        "model_arch": "ST-GCN",
+        "prediction": "walking",
+    },
+    "cardio": {
+        "application": "Retina Screening",
+        "task": "Disease/No disease",
+        "sensor": "Retina fundus image",
+        "model_arch": "CNN+FC",
+        "prediction": "No disease",
+    },
+    "lung": {
+        "application": "Chest Screening",
+        "task": "Disease/No disease",
+        "sensor": "Chest X-ray",
+        "model_arch": "CNN+FC",
+        "prediction": "No disease",
+    },
+    "cancer": {
+        "application": "Pathology Screening",
+        "task": "Disease/No disease",
+        "sensor": "Pathology microscopy",
+        "model_arch": "CNN+FC",
+        "prediction": "No disease",
+    },
+    "blood": {
+        "application": "Blood Cell Screening",
+        "task": "Disease/No disease",
+        "sensor": "Blood smear microscopy",
+        "model_arch": "CNN+FC",
+        "prediction": "No disease",
+    },
+}
+
+DISEASE_SCREENING_MODEL_IDS = {"cardio", "lung", "cancer", "blood"}
+
+HEALTH_RANDOM_OUTPUTS = {
+    "bp": {
+        "labels": ["with Human Movement", "without Human Movement"],
+        "weights": [3, 1],
+    },
+    "metabolic": {
+        "labels": ["walking on corridors", "upstairs", "downstairs"],
+        "weights": [4, 2, 2],
+    },
+    "ecg": {
+        "labels": ["box", "circle", "clean", "Fall", "run", "walk"],
+        "weights": [2, 2, 2, 1, 2, 4],
+    },
+}
+
+FINANCE_RANDOM_OUTPUTS = {
+    "income_capacity": [
+        "Strong income capacity",
+        "Moderate income capacity",
+        "Limited income capacity",
+    ],
+    "expense_burden": [
+        "Low expense burden",
+        "Elevated expense burden",
+        "High expense burden",
+    ],
+    "savings_resilience": [
+        "Healthy liquidity buffer",
+        "Thin liquidity buffer",
+        "Critical liquidity buffer",
+    ],
+    "loan_stress": [
+        "Low repayment pressure",
+        "Moderate repayment pressure",
+        "High repayment pressure",
+    ],
+    "credit_risk": [
+        "Stable credit profile",
+        "Credit risk watch",
+        "High credit risk",
+    ],
+    "profile_context": [
+        "Stable employment context",
+        "Context requires review",
+        "Regional context watch",
+    ],
+}
 
 app = FastAPI(title="Secure Multimodal HE + LLM Demo", version="3.1")
 
@@ -2229,10 +2376,10 @@ def _build_step1(flags: Dict[str, Any]) -> Dict[str, Any]:
 
 def _build_assignments(flags: Dict[str, Any]) -> List[Dict[str, str]]:
     pairs = [
-        ("csi", "ecg", "secure_ecg_toolbox"),
-        ("uwb", "bp", "secure_bp_toolbox"),
         ("depth", "sleep", "secure_sleep_toolbox"),
+        ("uwb", "bp", "secure_bp_toolbox"),
         ("imu", "metabolic", "secure_metabolic_toolbox"),
+        ("csi", "ecg", "secure_ecg_toolbox"),
         ("rgb", "risk", "secure_risk_toolbox"),
         ("ntu", "action", "secure_action_toolbox"),
         ("retina", "cardio", "secure_cardio_toolbox"),
@@ -2295,6 +2442,13 @@ def finance_score_for_model(model_id: str, record: Dict[str, str]) -> Dict[str, 
     return {"score": 50.0, "status": "watch"}
 
 
+def finance_result_label_for_model(model_id: str, score: float, status: str) -> str:
+    labels = FINANCE_RANDOM_OUTPUTS.get(model_id)
+    if labels:
+        return random.choice(labels)
+    return "Review recommended"
+
+
 def _score_for_model(model_id: str) -> Dict[str, Any]:
     scores = {
         "ecg": (75.5, "normal"),
@@ -2309,7 +2463,23 @@ def _score_for_model(model_id: str) -> Dict[str, Any]:
         "blood": (91.5, "normal"),
     }
     score, status = scores.get(model_id, (50.0, "unknown"))
-    return {"score": score, "status": status}
+    result = {"score": score, "status": status}
+    if model_id in HEALTH_RANDOM_OUTPUTS:
+        config = HEALTH_RANDOM_OUTPUTS[model_id]
+        result["prediction"] = random.choices(config["labels"], weights=config["weights"], k=1)[0]
+    elif model_id in DISEASE_SCREENING_MODEL_IDS:
+        prediction = "No disease" if random.random() < 0.75 else "Disease"
+        result["prediction"] = prediction
+        result["status"] = "normal" if prediction == "No disease" else "attention"
+    elif model_id == "action":
+        prediction = random.choices(
+            ["walking", "standing up", "sitting down", "waving hand", "falling down"],
+            weights=[4, 3, 3, 2, 1],
+            k=1,
+        )[0]
+        result["prediction"] = prediction
+        result["status"] = "attention" if prediction == "falling down" else "good"
+    return result
 
 def _build_step2(flags: Dict[str, Any], series: Dict[str, Optional[np.ndarray]]) -> Dict[str, Any]:
     step_start = time.time()
@@ -2330,14 +2500,17 @@ def _build_step2(flags: Dict[str, Any], series: Dict[str, Optional[np.ndarray]])
     results = []
     for assignment in assignments:
         model_meta = next((m for m in CLUSTER_MODELS if m["id"] == assignment["model_id"]), None)
+        task_meta = HEALTH_TASK_RESULTS.get(assignment["model_id"], {})
         scored = _score_for_model(assignment["model_id"])
         results.append({
             "model": model_meta["title"] if model_meta else assignment["model_id"],
             "model_id": assignment["model_id"],
             "input_modality": assignment["input_modality"],
             "tool": assignment["tool"],
+            **task_meta,
             "score": scored["score"],
             "status": scored["status"],
+            "prediction": scored.get("prediction", task_meta.get("prediction")),
         })
 
     return {
@@ -2420,13 +2593,17 @@ def _build_finance_step2(record: Dict[str, str], selected_ids: List[str]) -> Dic
     for assignment in assignments:
         model_meta = next((item for item in FINANCE_CLUSTER_MODELS if item["id"] == assignment["model_id"]), None)
         scored = finance_score_for_model(assignment["model_id"], record)
+        result_meta = FINANCE_RESULT_META.get(assignment["model_id"], {})
+        prediction = finance_result_label_for_model(assignment["model_id"], scored["score"], scored["status"])
         results.append({
             "model": model_meta["title"] if model_meta else assignment["model_id"],
             "model_id": assignment["model_id"],
             "input_modality": assignment["input_modality"],
             "tool": assignment["tool"],
+            **result_meta,
             "score": scored["score"],
             "status": scored["status"],
+            "prediction": prediction,
         })
 
     return {
@@ -3520,14 +3697,14 @@ async def run_cycle(selected_modalities: Optional[str] = None, llm_provider: Opt
 
         # LLM智能分配 (支持所有10种模态，使用完整模态名称)
         assignments = []
-        if selected_csi:
-            assignments.append({"input_modality": selected_csi, "model_id": "ecg", "tool": "secure_ecg_toolbox"})
-        if selected_uwb:
-            assignments.append({"input_modality": selected_uwb, "model_id": "bp", "tool": "secure_bp_toolbox"})
         if selected_depth:
             assignments.append({"input_modality": selected_depth, "model_id": "sleep", "tool": "secure_sleep_toolbox"})
+        if selected_uwb:
+            assignments.append({"input_modality": selected_uwb, "model_id": "bp", "tool": "secure_bp_toolbox"})
         if selected_imu:
             assignments.append({"input_modality": selected_imu, "model_id": "metabolic", "tool": "secure_metabolic_toolbox"})
+        if selected_csi:
+            assignments.append({"input_modality": selected_csi, "model_id": "ecg", "tool": "secure_ecg_toolbox"})
         if selected_rgb:
             assignments.append({"input_modality": selected_rgb, "model_id": "risk", "tool": "secure_risk_toolbox"})
         if selected_ntu:
@@ -3589,13 +3766,20 @@ async def run_cycle(selected_modalities: Optional[str] = None, llm_provider: Opt
                 score = 50.0
                 status = "unknown"
 
+            task_meta = HEALTH_TASK_RESULTS.get(a["model_id"], {})
+            scored = _score_for_model(a["model_id"])
+            score = scored["score"]
+            status = scored["status"]
+
             results.append({
                 "model": model_title,
                 "model_id": a["model_id"],
                 "input_modality": a["input_modality"],
                 "tool": a["tool"],
+                **task_meta,
                 "score": score,
-                "status": status
+                "status": status,
+                "prediction": scored.get("prediction", task_meta.get("prediction")),
             })
 
         # 工具执行时间（模拟）

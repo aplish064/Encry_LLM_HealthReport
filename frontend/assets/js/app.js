@@ -1,13 +1,116 @@
 // frontend/assets/js/app.js
 const API_BASE = (
   window.API_BASE ||
-  (window.location.port === "8001"
+  (["8001", "8080"].includes(window.location.port)
     ? `${window.location.protocol}//${window.location.hostname}:8082`
     : "")
 );
 window.API_BASE = API_BASE;
 
 const $ = (id) => document.getElementById(id);
+
+const HEALTH_TASK_RESULTS = {
+  sleep: {
+    application: "Gesture Recognition",
+    task: "Good/ok/victory/stop/fist",
+    sensor: "PicoZense DCAM710",
+    model_arch: "1CNN+FC",
+    prediction: "ok",
+  },
+  bp: {
+    application: "Human Movement Detection",
+    task: "With/without Human Movement",
+    sensor: "Decawave DWM1000 UWB",
+    model_arch: "1FC",
+  },
+  metabolic: {
+    application: "Walking Activity Recognition",
+    task: "Walking on corridors/upstairs/downstairs",
+    sensor: "LPMS-B2 IMU",
+    model_arch: "2FC",
+  },
+  ecg: {
+    application: "Human Activity Recognition",
+    task: "Box/circle/clean/Fall/run/walk",
+    sensor: "Atheros CSI Tool",
+    model_arch: "3FC",
+  },
+  risk: {
+    application: "Fall Detection",
+    task: "Fall/Not Fall",
+    sensor: "Camera",
+    model_arch: "1CNN+2FC",
+    prediction: "Fall",
+  },
+  action: {
+    application: "Human Action Recognition",
+    task: "NTU skeleton action classification",
+    sensor: "RGB-D Skeleton",
+    model_arch: "ST-GCN",
+  },
+  cardio: {
+    application: "Retina Screening",
+    task: "Disease/No disease",
+    sensor: "Retina fundus image",
+    model_arch: "CNN+FC",
+  },
+  lung: {
+    application: "Chest Screening",
+    task: "Disease/No disease",
+    sensor: "Chest X-ray",
+    model_arch: "CNN+FC",
+  },
+  cancer: {
+    application: "Pathology Screening",
+    task: "Disease/No disease",
+    sensor: "Pathology microscopy",
+    model_arch: "CNN+FC",
+  },
+  blood: {
+    application: "Blood Cell Screening",
+    task: "Disease/No disease",
+    sensor: "Blood smear microscopy",
+    model_arch: "CNN+FC",
+  },
+};
+
+const HEALTH_RESULT_ORDER = ["sleep", "bp", "metabolic", "ecg", "risk", "action", "cardio", "lung", "cancer", "blood"];
+
+const FINANCE_RESULT_LABELS = {
+  income_capacity: {
+    application: "Income Capacity",
+    model_arch: "Income Encoder",
+  },
+  expense_burden: {
+    application: "Expense Burden",
+    model_arch: "Cashflow Encoder",
+  },
+  savings_resilience: {
+    application: "Savings Resilience",
+    model_arch: "Liquidity Encoder",
+  },
+  loan_stress: {
+    application: "Loan Stress",
+    model_arch: "Repayment Encoder",
+  },
+  credit_risk: {
+    application: "Credit Risk",
+    model_arch: "Credit Encoder",
+  },
+  profile_context: {
+    application: "Profile Context",
+    model_arch: "Context Encoder",
+  },
+};
+
+const FINANCE_RESULT_ORDER = [
+  "income_capacity",
+  "expense_burden",
+  "savings_resilience",
+  "loan_stress",
+  "credit_risk",
+  "profile_context",
+];
 
 const WORKFLOW_PANEL_BY_STEP = {
   select: "stepUpload",
@@ -196,11 +299,28 @@ function renderResults(rows) {
   tbody.innerHTML = "";
 
   console.log("renderResults called with rows:", rows);
+  const isHealthTaskTable = (rows || []).some((r) => {
+    const modelId = String(r?.model_id || "").toLowerCase();
+    return Boolean(r?.task || HEALTH_TASK_RESULTS[modelId]);
+  });
+  const isFinanceResultTable = !isHealthTaskTable && (rows || []).some((r) => {
+    const modelId = String(r?.model_id || "").toLowerCase();
+    return Boolean(r?.prediction || FINANCE_RESULT_LABELS[modelId]);
+  });
+  const headers = isHealthTaskTable
+    ? ["Application", "Sensor", "Model", "Output"]
+    : isFinanceResultTable
+      ? ["Application", "Input", "Model", "Output"]
+      : ["Model", "Input", "Score", "Status"];
+  const theadRow = table.querySelector("thead tr");
+  if (theadRow) {
+    theadRow.innerHTML = headers.map((label) => `<th>${escHtml(label)}</th>`).join("");
+  }
 
   if (!rows || rows.length === 0) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 4;
+    td.colSpan = headers.length;
     td.textContent = "No results available";
     td.style.textAlign = "center";
     td.style.color = "var(--muted)";
@@ -209,12 +329,61 @@ function renderResults(rows) {
     return;
   }
 
-  for (const r of rows) {
+  const displayRows = isHealthTaskTable
+    ? [...rows].sort((a, b) => {
+        const aIndex = HEALTH_RESULT_ORDER.indexOf(String(a?.model_id || "").toLowerCase());
+        const bIndex = HEALTH_RESULT_ORDER.indexOf(String(b?.model_id || "").toLowerCase());
+        return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+      })
+    : isFinanceResultTable
+      ? [...rows].sort((a, b) => {
+          const aIndex = FINANCE_RESULT_ORDER.indexOf(String(a?.model_id || "").toLowerCase());
+          const bIndex = FINANCE_RESULT_ORDER.indexOf(String(b?.model_id || "").toLowerCase());
+          return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+        })
+    : rows;
+
+  for (const r of displayRows) {
     const tr = document.createElement("tr");
+
+    if (isHealthTaskTable) {
+      const modelId = String(r?.model_id || "").toLowerCase();
+      const meta = { ...(HEALTH_TASK_RESULTS[modelId] || {}), ...r };
+      const cells = [
+        meta.application || r.model,
+        meta.sensor || r.input_modality,
+        meta.model_arch || r.model,
+        meta.prediction || r.status,
+      ];
+      cells.forEach((value) => {
+        const td = document.createElement("td");
+        td.textContent = safeText(value, "—");
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+      continue;
+    }
+
+    if (isFinanceResultTable) {
+      const modelId = String(r?.model_id || "").toLowerCase();
+      const meta = { ...(FINANCE_RESULT_LABELS[modelId] || {}), ...r };
+      const cells = [
+        meta.application || r.model,
+        r.input_modality,
+        meta.model_arch || r.model,
+        meta.prediction || meta.fallback || r.status,
+      ];
+      cells.forEach((value) => {
+        const td = document.createElement("td");
+        td.textContent = safeText(value, "—");
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+      continue;
+    }
 
     const tdModel = document.createElement("td");
     tdModel.textContent = safeText(r.model);
-
     const tdInput = document.createElement("td");
     tdInput.textContent = safeText(r.input_modality);
 
@@ -553,11 +722,10 @@ function svgStabilityChart(chart) {
   }).join(" ");
   const color = score >= 0.7 ? "#22c55e" : score >= 0.4 ? "#f97316" : "#ef4444";
   return `
-    <svg viewBox="0 0 360 150" role="img" aria-label="stability trend">
-      <rect x="1" y="1" width="358" height="148" rx="12" fill="#fff" stroke="rgba(230,232,239,.9)"/>
+    <svg viewBox="0 0 360 76" role="img" aria-label="stability score">
+      <rect x="1" y="1" width="358" height="74" rx="12" fill="#fff" stroke="rgba(230,232,239,.9)"/>
       <rect x="18" y="34" width="${(324 * score).toFixed(1)}" height="18" rx="9" fill="${color}"/>
       <rect x="18" y="34" width="324" height="18" rx="9" fill="none" stroke="rgba(15,23,42,.12)"/>
-      <polyline points="${points}" fill="none" stroke="#0f172a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       <text x="18" y="26" font-size="12" font-weight="800" fill="#0f172a">Stability ${Math.round(score * 100)}%</text>
     </svg>
   `;
@@ -573,7 +741,10 @@ function compactStabilityCard(chart) {
   ].filter(Boolean).join(" · ");
   return `
     <div class="compactStability">
-      <div class="compactStabilityScore">${Math.round(score * 100)}%</div>
+      <div class="compactStabilityTop">
+        <span>Stability</span>
+        <strong>${Math.round(score * 100)}%</strong>
+      </div>
       <div class="compactStabilityTrack"><i style="width:${Math.round(score * 100)}%"></i></div>
       ${extras ? `<div class="compactStabilityMeta">${escHtml(extras)}</div>` : ""}
     </div>
@@ -610,7 +781,7 @@ function metricMiniCard(metric) {
 function renderSectionChart(section, options = {}) {
   const type = section?.chart_type;
   const chart = section?.chart || {};
-  if (options.compact && type === "stability") return compactStabilityCard(chart);
+  if (type === "stability") return compactStabilityCard(chart);
   if (type === "reference_bars") return svgBarVitals(chart);
   if (type === "radar") return svgRadar(chart);
   if (section?.id === "activity" || type === "donut") {

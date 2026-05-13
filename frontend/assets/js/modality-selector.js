@@ -788,16 +788,16 @@ class ModalitySelector {
     }
 
     const healthcareModels = [
-      { id: 'sleep', title: 'Sleep Staging', subtitle: 'Depth-based Model', modalityId: 'depth' },
-      { id: 'bp', title: 'Blood Pressure', subtitle: 'UWB Regression', modalityId: 'uwb' },
-      { id: 'metabolic', title: 'Metabolic Score', subtitle: 'IMU Proxy', modalityId: 'imu' },
-      { id: 'ecg', title: 'ECG Arrhythmia', subtitle: 'CSI Heart Pattern', modalityId: 'csi' },
-      { id: 'risk', title: 'Risk Assessment', subtitle: 'RGB Triage', modalityId: 'rgb' },
-      { id: 'action', title: 'Action Recognition', subtitle: 'Skeleton Model', modalityId: 'ntu' },
-      { id: 'cardio', title: 'Cardiovascular', subtitle: 'Retina Analysis', modalityId: 'retina' },
-      { id: 'lung', title: 'Lung Screening', subtitle: 'X-ray Analysis', modalityId: 'chest' },
-      { id: 'cancer', title: 'Cancer Detection', subtitle: 'Pathology Model', modalityId: 'path' },
-      { id: 'blood', title: 'Blood Analysis', subtitle: 'Hematology Model', modalityId: 'blood' }
+      { id: 'sleep', title: 'Gesture Recognition', subtitle: 'Depth / 1CNN+FC', modalityId: 'depth' },
+      { id: 'bp', title: 'Human Movement Detection', subtitle: 'UWB / 1FC', modalityId: 'uwb' },
+      { id: 'metabolic', title: 'Walking Activity Recognition', subtitle: 'IMU / 2FC', modalityId: 'imu' },
+      { id: 'ecg', title: 'Human Activity Recognition', subtitle: 'CSI / 3FC', modalityId: 'csi' },
+      { id: 'risk', title: 'Fall Detection', subtitle: 'RGB / 1CNN+2FC', modalityId: 'rgb' },
+      { id: 'action', title: 'Human Action Recognition', subtitle: 'NTU / ST-GCN', modalityId: 'ntu' },
+      { id: 'cardio', title: 'Retina Screening', subtitle: 'Fundus / CNN+FC', modalityId: 'retina' },
+      { id: 'lung', title: 'Chest Screening', subtitle: 'X-ray / CNN+FC', modalityId: 'chest' },
+      { id: 'cancer', title: 'Pathology Screening', subtitle: 'Microscopy / CNN+FC', modalityId: 'path' },
+      { id: 'blood', title: 'Blood Cell Screening', subtitle: 'Smear / CNN+FC', modalityId: 'blood' }
     ];
     const financeModels = [
       { id: 'income_capacity', title: 'Income Capacity', subtitle: 'Income Encoder', modalityId: 'income' },
